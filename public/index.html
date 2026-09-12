@@ -3,3202 +3,2793 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EmojiTV — Play Face-Off, Video Chat & Hunt</title>
-
+<title>EmojiTV</title>
+<meta name="description" content="EmojiTV — Face-Off, Video Chat and Emoji Hunt.">
 <style>
 *{box-sizing:border-box}
-
-body{
-margin:0;
-font-family:Inter,system-ui,Arial,sans-serif;
-background:radial-gradient(circle at top,#182342 0,#080b16 48%);
-color:#fff;
-min-height:100vh
-}
-
-button,input{
-font:inherit
-}
-
-button{
-border:0;
-cursor:pointer
-}
-
-.app{
-max-width:1220px;
-margin:auto;
-padding:22px;
-min-height:100vh;
-display:flex;
-flex-direction:column
-}
-
-header{
-display:flex;
-justify-content:space-between;
-align-items:center;
-margin-bottom:18px
-}
-
-.brand{
-font-size:25px;
-font-weight:950;
-letter-spacing:-.5px
-}
-
-.pill{
-padding:8px 12px;
-border-radius:999px;
-background:#151a2b;
-color:#b9c4df;
-font-size:13px
-}
-
-.screen{
-display:none
-}
-
-.screen.active{
-display:block
-}
-
-.hero{
-text-align:center;
-padding:35px 10px 20px
-}
-
-.hero h1{
-font-size:clamp(42px,7vw,76px);
-margin:0 0 10px
-}
-
-.hero p{
-color:#aeb7ce;
-font-size:18px;
-max-width:680px;
-margin:0 auto 24px
-}
-
-.dashboard{
-display:grid;
-grid-template-columns:repeat(3,1fr);
-gap:18px;
-margin-top:25px
-}
-
-.mode{
-background:linear-gradient(180deg,#131a2e,#0f1423);
-border:1px solid #263352;
-border-radius:22px;
-padding:22px;
-text-align:left;
-box-shadow:0 14px 45px #0004
-}
-
-.mode .modeEmoji{
-font-size:58px
-}
-
-.mode h2{
-margin:10px 0 7px
-}
-
-.mode p{
-color:#9faac2;
-min-height:58px;
-line-height:1.45
-}
-
-.primary,.mode button{
-background:#fff;
-color:#080b16;
-padding:13px 19px;
-border-radius:13px;
-font-weight:900
-}
-
-.mode button{
-width:100%;
-margin-top:8px
-}
-
-.secondary{
-background:#151a2b;
-color:#fff;
-padding:11px 17px;
-border-radius:12px
-}
-
-.danger{
-background:#3a1821
-}
-
-.card{
-background:#101525dd;
-border:1px solid #202a43;
-border-radius:22px;
-padding:20px;
-box-shadow:0 18px 55px #0003
-}
-
-.status{
-text-align:center;
-margin:8px 0 18px;
-color:#aeb7ce
-}
-
-.videos{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:16px
-}
-
-.videoCard{
-position:relative;
-background:#05070c;
-border-radius:18px;
-overflow:hidden;
-min-height:300px;
-border:1px solid #202a43
-}
-
-.videoCard video{
-width:100%;
-height:100%;
-min-height:300px;
-display:block;
-object-fit:cover;
-transform:scaleX(-1);
-background:#05070c
-}
-
-.videoCard.opponent video{
-transform:none
-}
-
-.label{
-position:absolute;
-top:12px;
-left:12px;
-background:#000b;
-padding:7px 10px;
-border-radius:10px;
-font-size:13px;
-z-index:2
-}
-
-.emoji{
-text-align:center;
-font-size:108px;
-margin:5px
-}
-
-.round{
-text-align:center;
-color:#aeb7ce;
-margin-bottom:3px
-}
-
-.countdown{
-font-size:27px;
-font-weight:950;
-text-align:center;
-margin:8px
-}
-
-.scorebar{
-display:flex;
-justify-content:center;
-gap:12px;
-flex-wrap:wrap;
-margin:8px 0 12px
-}
-
-.score{
-background:#101525;
-border:1px solid #202a43;
-border-radius:12px;
-padding:8px 14px;
-color:#dce4f7
-}
-
-.live-score{
-font-weight:950;
-color:#fff
-}
-
-.controls{
-display:flex;
-justify-content:center;
-gap:10px;
-margin-top:16px;
-flex-wrap:wrap
-}
-
-.notice{
-display:none;
-padding:14px;
-border-radius:14px;
-background:#2b1620;
-color:#ffd4df;
-margin:12px 0
-}
-
-.notice.show{
-display:block
-}
-
-.tiny{
-font-size:13px;
-color:#8994ad;
-text-align:center;
-margin-top:13px
-}
-
-.spinner{
-font-size:48px;
-text-align:center;
-animation:spin 1.2s linear infinite
-}
-
-@keyframes spin{
-to{transform:rotate(360deg)}
-}
-
-.result{
-text-align:center;
-font-size:24px;
-font-weight:950;
-margin:12px;
-min-height:29px
-}
-
-.face-status,.hunt-status{
-text-align:center;
-color:#a9b4cc;
-font-size:13px;
-min-height:20px
-}
-
-.chatBox{
-margin-top:16px
-}
-
-.messages{
-height:150px;
-overflow:auto;
-background:#090d18;
-border:1px solid #202a43;
-border-radius:14px;
-padding:12px
-}
-
-.msg{
-margin:6px 0;
-color:#dfe6f8
-}
-
-.msg.self{
-text-align:right
-}
-
-.chatRow{
-display:flex;
-gap:8px;
-margin-top:8px
-}
-
-.chatRow input{
-flex:1;
-background:#0b1020;
-color:white;
-border:1px solid #263352;
-border-radius:12px;
-padding:12px
-}
-
-.huntTarget{
-display:flex;
-align-items:center;
-justify-content:center;
-gap:14px;
-margin:4px 0 12px
-}
-
-.huntTarget .emoji{
-margin:0;
-font-size:90px
-}
-
-.huntTarget .targetName{
-font-size:25px;
-font-weight:950
-}
-
-.huntPanel{
-background:#0c1220;
-border:1px solid #202a43;
-border-radius:16px;
-padding:14px;
-text-align:center
-}
-
-.progress{
-height:11px;
-background:#202a43;
-border-radius:999px;
-overflow:hidden;
-margin:10px 0
-}
-
-.progress>div{
-height:100%;
-width:0;
-background:#fff;
-transition:width .2s
-}
-
-.cameraHint{
-color:#9faac2;
-font-size:13px
-}
-
-.footer{
-text-align:center;
-color:#68738d;
-font-size:13px;
-margin-top:auto;
-padding-top:25px
-}
-
-.made-with-heart{
-display:inline-block;
-margin-top:5px;
-font-size:12px;
-color:#8b94aa
-}
-
-.back{
-margin-bottom:12px
-}
-
-@media(max-width:850px){
-.dashboard{
-grid-template-columns:1fr
-}
-
-.videos{
-grid-template-columns:1fr
-}
-
-.videoCard,
-.videoCard video{
-min-height:235px
-}
-
-.hero{
-padding-top:15px
-}
-}
-
-.reportBtn{
-background:#3a1821!important;
-color:#ffd9e2!important;
-border:1px solid #6a2a3a!important
-}
-
-.reportModal{
-position:fixed;
-inset:0;
-background:#050812dd;
-backdrop-filter:blur(9px);
-display:none;
-align-items:center;
-justify-content:center;
-padding:18px;
-z-index:100
-}
-
-.reportModal.show{
-display:flex
-}
-
-.reportCard{
-width:min(560px,100%);
-background:#11182a;
-border:1px solid #33415f;
-border-radius:22px;
-padding:22px;
-box-shadow:0 25px 90px #0009
-}
-
-.reportCard h2{
-margin:0 0 7px
-}
-
-.reportCard p{
-color:#aeb7ce;
-line-height:1.45
-}
-
-.reportCard select,
-.reportCard textarea{
-width:100%;
-background:#080d19;
-color:#fff;
-border:1px solid #2b3958;
-border-radius:12px;
-padding:12px;
-margin:7px 0 12px
-}
-
-.reportCard textarea{
-min-height:110px;
-resize:vertical
-}
-
-.reportMeta{
-font-size:12px;
-color:#8994ad;
-background:#0b101d;
-border-radius:12px;
-padding:10px;
-margin-bottom:12px
-}
-
-.reportActions{
-display:flex;
-justify-content:flex-end;
-gap:9px;
-flex-wrap:wrap
-}
-
-.reportSuccess{
-display:none;
-background:#102a1d;
-color:#c9ffe0;
-padding:12px;
-border-radius:12px;
-margin:10px 0
-}
-
-.reportSuccess.show{
-display:block
-}
-</style>
-
-<style>
-#nameGate{
-position:fixed;
-inset:0;
-background:#070a13ee;
-backdrop-filter:blur(10px);
-display:flex;
-align-items:center;
-justify-content:center;
-padding:20px;
-z-index:50
-}
-
-#nameGate.hidden{
-display:none
-}
-
-.nameCard{
-width:min(480px,100%);
-background:#11182a;
-border:1px solid #2a3858;
-border-radius:24px;
-padding:28px;
-box-shadow:0 25px 80px #0008;
-text-align:center
-}
-
-.nameCard h2{
-font-size:32px;
-margin:0 0 8px
-}
-
-.nameCard p{
-color:#aeb7ce;
-line-height:1.5
-}
-
-.nameCard input{
-width:100%;
-background:#080d19;
-color:#fff;
-border:1px solid #2b3958;
-border-radius:13px;
-padding:14px 15px;
-outline:none;
-margin:10px 0
-}
-
-.nameCard button{
-width:100%;
-margin-top:6px
-}
-
-.dashboardShare{
-position:fixed;
-left:20px;
-bottom:20px;
-z-index:20;
-display:none
-}
-
-.dashboardShare button{
-box-shadow:0 10px 30px #0006
-}
-
-.dashboardTools{
-display:flex;
-justify-content:center;
-gap:10px;
-flex-wrap:wrap;
-margin:22px 0 8px
-}
-
-.onlinePanel,
-.leaderPanel{
-background:#101525dd;
-border:1px solid #202a43;
-border-radius:18px;
-padding:16px;
-margin-top:12px;
-text-align:left
-}
-
-.onlineHead,
-.leaderHead{
-display:flex;
-justify-content:space-between;
-align-items:center;
-gap:10px
-}
-
-.onlineHead h3,
-.leaderHead h3{
-margin:0
-}
-
-.onlineNames{
-display:flex;
-flex-wrap:wrap;
-gap:7px;
-margin-top:12px
-}
-
-.onlineName{
-background:#151d31;
-border:1px solid #283655;
-border-radius:999px;
-padding:6px 9px;
-font-size:12px;
-color:#dfe6f8
-}
-
-.leaderboards{
-display:grid;
-grid-template-columns:repeat(3,1fr);
-gap:12px;
-margin-top:12px
-}
-
-.leaderTable{
-background:#0b101d;
-border:1px solid #202a43;
-border-radius:14px;
-padding:12px
-}
-
-.leaderTable h4{
-margin:0 0 8px
-}
-
-.leaderRow{
-display:grid;
-grid-template-columns:28px 1fr auto;
-gap:8px;
-padding:7px 0;
-border-bottom:1px solid #182238;
-font-size:13px
-}
-
-.leaderRow:last-child{
-border-bottom:0
-}
-
-.leaderEmpty{
-color:#7f8aa3;
-font-size:13px
-}
-
-.friendRow{
-display:flex;
-align-items:center;
-justify-content:space-between;
-gap:8px;
-background:#0b101d;
-border:1px solid #202a43;
-border-radius:12px;
-padding:9px;
-margin:7px 0
-}
-
-.friendRowName{
-font-weight:800
-}
-
-.friendActions{
-display:flex;
-gap:5px;
-flex-wrap:wrap
-}
-
-.friendActions button{
-padding:7px 9px;
-font-size:11px
-}
-
-.inviteBox{
-background:#0b101d;
-border:1px solid #202a43;
-border-radius:14px;
-padding:12px;
-margin:10px 0
-}
-
-.inviteActions{
-display:flex;
-gap:7px;
-flex-wrap:wrap;
-margin-top:8px
-}
-
-.usernameBadge{
-color:#dfe6f8;
-font-weight:800
-}
-
-.friendSearchHome{
-margin:14px 0 0;
-text-align:left
-}
-
-.friendSearchHome input{
-flex:1;
-background:#0b1020;
-color:#fff;
-border:1px solid #263352;
-border-radius:12px;
-padding:12px
-}
-
-.hiddenPanel{
-display:none
-}
-
-.hiddenPanel.show{
-display:block
-}
-
-@media(max-width:850px){
-.leaderboards{
-grid-template-columns:1fr
-}
-
-.dashboardShare{
-display:block;
-left:14px;
-bottom:14px
-}
+html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#080b16;color:#fff}
+body{background:radial-gradient(circle at top,#182342 0,#080b16 55%);padding:18px}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+.app{width:min(1220px,100%);margin:auto}
+.card{background:rgba(15,22,42,.94);border:1px solid #273451;border-radius:20px;padding:18px;box-shadow:0 14px 40px rgba(0,0,0,.22)}
+.header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.brand{font-size:28px;font-weight:1000;letter-spacing:-1px}
+.brand span{color:#8ea8ff}
+.headerRight{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{background:#121b33;border:1px solid #30405f;padding:8px 12px;border-radius:999px;color:#bdc8df;font-size:13px}
+.primary,.secondary,.danger{border:0;border-radius:12px;padding:11px 15px;font-weight:900;color:#fff}
+.primary{background:#526dff}
+.primary:hover{background:#647dff}
+.secondary{background:#202c49;border:1px solid #354565}
+.secondary:hover{background:#293958}
+.danger{background:#9f3043}
+.danger:hover{background:#bd3c50}
+button:disabled{opacity:.45;cursor:not-allowed}
+.hero{padding:28px;text-align:center;margin-bottom:18px}
+.hero h1{font-size:clamp(34px,6vw,62px);margin:0 0 8px;letter-spacing:-2px}
+.hero p{color:#aeb8ce;margin:0 auto 18px;max-width:680px}
+.toolsGrid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:14px;margin-bottom:18px}
+.friendSearchHome{min-height:145px}
+.chatRow{display:flex;gap:8px}
+.chatRow input{flex:1}
+input,textarea,select{background:#080d19;color:#fff;border:1px solid #2b3958;border-radius:12px;padding:12px;outline:none}
+input:focus,textarea:focus,select:focus{border-color:#627eff}
+textarea{width:100%;min-height:100px;resize:vertical}
+.tiny{font-size:12px;color:#9faac2;margin-top:8px}
+.onlineNames{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.onlineName{background:#111a30;border:1px solid #293856;padding:7px 10px;border-radius:999px;font-size:12px;color:#cbd4e7}
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.modeCard{min-height:245px;display:flex;flex-direction:column;justify-content:space-between}
+.modeEmoji{font-size:54px}
+.modeCard h2{margin:8px 0 5px}
+.modeCard p{color:#9faac2;font-size:14px;line-height:1.5}
+.modeCard .primary{width:100%}
+.screen{display:none}
+.screen.active{display:block}
+.waiting{min-height:420px;display:flex;align-items:center;justify-content:center;text-align:center}
+.spinner{width:54px;height:54px;border:5px solid #263552;border-top-color:#6a82ff;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.gameTop{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.gameTitle{font-size:26px;font-weight:1000}
+.gameSub{color:#9faac2;font-size:13px}
+.videoGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.videoCard{position:relative;background:#050812;border:1px solid #293754;border-radius:20px;overflow:hidden;min-height:310px}
+.videoCard video{width:100%;height:100%;min-height:310px;object-fit:cover;background:#050812}
+.videoCard.local video{transform:scaleX(-1)}
+.videoLabel{position:absolute;left:12px;top:12px;background:rgba(4,8,18,.78);border:1px solid rgba(255,255,255,.12);padding:8px 11px;border-radius:10px;font-weight:900;font-size:13px;z-index:2}
+.targetBox{text-align:center;padding:18px;margin-bottom:14px}
+.targetEmoji{font-size:95px;line-height:1}
+.targetText{font-size:25px;font-weight:1000;margin-top:8px}
+.countdown{font-size:34px;font-weight:1000;margin:8px 0}
+.scoreBar{height:12px;background:#0a1020;border-radius:999px;overflow:hidden;border:1px solid #283552;margin:12px 0}
+.scoreBar>div{height:100%;width:0%;background:#647dff;transition:width .15s}
+.controls{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+.resultBox{text-align:center;padding:25px}
+.resultBig{font-size:42px;font-weight:1000}
+.chatLayout{display:grid;grid-template-columns:1fr 330px;gap:14px}
+.chatMessages{height:470px;overflow:auto;background:#070c18;border:1px solid #293754;border-radius:18px;padding:14px}
+.message{margin:7px 0;padding:10px 12px;border-radius:12px;background:#16213a;max-width:80%}
+.message.self{margin-left:auto;background:#526dff}
+.chatSide{display:flex;flex-direction:column;gap:12px}
+.chatSide .card{height:max-content}
+.reportModal,.nameGate,.inviteModal{position:fixed;inset:0;background:rgba(2,5,12,.78);display:flex;align-items:center;justify-content:center;padding:18px;z-index:100}
+.modal{width:min(520px,100%);max-height:90vh;overflow:auto}
+.modal h2{margin-top:0}
+.modalActions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.friendsList{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.friendRow{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#0c1426;border:1px solid #263551;border-radius:12px;padding:10px}
+.friendOnline{color:#72e6a1;font-size:11px}
+.friendOffline{color:#75809a;font-size:11px}
+.leaderboard{width:100%;border-collapse:collapse;margin-top:10px}
+.leaderboard th,.leaderboard td{text-align:left;padding:8px;border-bottom:1px solid #24314b;font-size:12px}
+.footer{text-align:center;color:#7e8aa4;font-size:12px;padding:25px 0}
+.made-with-heart{opacity:.7}
+.dashboardShare{display:none}
+.reportButton{position:absolute;right:12px;top:12px;z-index:5}
+.error{background:#411824;border:1px solid #773042;color:#ffb8c4;border-radius:12px;padding:10px;margin-top:10px}
+.success{background:#123624;border:1px solid #256445;color:#a8f0c6;border-radius:12px;padding:10px;margin-top:10px}
+.skipStatus{text-align:center;color:#aeb8ce;font-size:13px;margin-top:8px}
+@media(max-width:900px){
+.toolsGrid{grid-template-columns:1fr 1fr}
+.modes{grid-template-columns:1fr}
+.chatLayout{grid-template-columns:1fr}
+}
+@media(max-width:650px){
+body{padding:10px}
+.header{align-items:flex-start}
+.brand{font-size:23px}
+.headerRight .secondary{display:none}
+.toolsGrid{grid-template-columns:1fr}
+.videoGrid{grid-template-columns:1fr}
+.videoCard,.videoCard video{min-height:250px}
+.hero{padding:22px 15px}
+.dashboardShare{display:block;position:fixed;left:12px;bottom:12px;z-index:50;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
 }
 </style>
 </head>
-
 <body>
-
-<div id="nameGate">
-<div class="nameCard">
-<h2>👋 Welcome to EmojiTV</h2>
-<p>Choose a username. It will be saved on this device and used for matchmaking, the online list, and leaderboards.</p>
-<input id="usernameInput" maxlength="20" autocomplete="nickname" placeholder="Enter your username">
-<button class="primary" id="saveUsername">SAVE & PLAY</button>
-<div class="tiny">Use a nickname — don't enter private information.</div>
-</div>
-</div>
-
-<div id="reportModal" class="reportModal" aria-hidden="true">
-<div class="reportCard">
-<h2>🚩 Report a player</h2>
-<p>If something inappropriate or unsafe happens, report it here. Your report includes the game mode, usernames, time, and connection ID so it can be reviewed.</p>
-<div class="reportMeta" id="reportMeta">Connected player: —</div>
-
-<label for="reportReason"><strong>What happened?</strong></label>
-
-<select id="reportReason">
-<option value="harassment">Harassment or bullying</option>
-<option value="sexual-content">Sexual or inappropriate content</option>
-<option value="hate">Hateful or discriminatory behavior</option>
-<option value="threats">Threats or dangerous behavior</option>
-<option value="spam">Spam, scams, or advertising</option>
-<option value="privacy">Sharing personal information</option>
-<option value="other">Something else</option>
-</select>
-
-<label for="reportDetails"><strong>Details (optional)</strong></label>
-
-<textarea id="reportDetails" maxlength="1000" placeholder="Briefly explain what happened..."></textarea>
-
-<div id="reportSuccess" class="reportSuccess"></div>
-
-<div class="reportActions">
-<button class="secondary" id="reportCancel">CANCEL</button>
-<button class="secondary reportBtn" id="reportSubmit">SUBMIT REPORT</button>
-</div>
-
-<div class="tiny">
-For immediate safety concerns, leave the match and tell a trusted adult. EmojiTV does not record or save your camera/video as part of a report.
-</div>
-
-</div>
-</div>
-
 <div class="app">
 
-<header>
-<div class="brand">🎭 EmojiTV</div>
-<div class="pill" id="connection">Not connected</div>
+<header class="header">
+  <div class="brand">🎭 Emoji<span>TV</span></div>
+  <div class="headerRight">
+    <div class="badge">👤 <span id="currentUsername">Guest</span></div>
+    <button class="secondary" id="friendsButton">👥 Friends</button>
+    <button class="secondary" id="messagesButton">💬 Messages</button>
+  </div>
 </header>
+
+<div id="globalError"></div>
 
 <section id="home" class="screen active">
 
-<div class="hero">
-<h1>EmojiTV</h1>
-<p>
-Face people, chat with random players, or race to find objects around you.
-</p>
+  <div class="hero card">
+    <h1>Play. Match. React. 🎭</h1>
+    <p>Challenge a random player in Face-Off, hang out in Video Chat, or race to find objects in Emoji Hunt.</p>
+    <button class="primary" id="changeNameButton">CHANGE USERNAME</button>
+  </div>
 
-<div class="dashboard">
+  <div class="toolsGrid">
 
-<div class="mode">
-<div class="modeEmoji">😀</div>
-<h2>Face-Off</h2>
-<p>
-Match the emoji expression. You have 10 seconds to make your face match the target.
-</p>
-<button data-mode="face">PLAY FACE-OFF</button>
-</div>
+    <div class="friendSearchHome card">
+      <div style="font-weight:900;font-size:18px">👥 Add a friend</div>
+      <div style="color:#9faac2;font-size:13px;margin:5px 0 10px">
+        Search for their username while they are online.
+      </div>
+      <div class="chatRow">
+        <input id="friendSearchInput" maxlength="20" placeholder="Search username">
+        <button class="primary" id="friendSearchButton">ADD FRIEND</button>
+      </div>
+      <div id="friendSearchResult" class="tiny"></div>
+    </div>
 
-<div class="mode">
-<div class="modeEmoji">📹</div>
-<h2>Video Chat</h2>
-<p>
-Get matched with another player for a simple live video conversation.
-</p>
-<button data-mode="chat">START VIDEO CHAT</button>
-</div>
+    <div class="card">
+      <div style="font-weight:900;font-size:18px">🌎 Online Players</div>
+      <div style="margin-top:6px;color:#9faac2;font-size:13px">
+        <b id="onlineCountLarge">0</b> players online
+      </div>
+      <div id="onlineNames" class="onlineNames"></div>
+    </div>
 
-<div class="mode">
-<div class="modeEmoji">🔎</div>
-<h2>Emoji Hunt</h2>
-<p>
-Find the object shown by the emoji before your opponent does.
-</p>
-<button data-mode="hunt">PLAY EMOJI HUNT</button>
-</div>
+    <div class="card">
+      <div style="font-weight:900;font-size:18px">🏆 Leaderboards</div>
+      <div style="color:#9faac2;font-size:13px;margin-top:6px">
+        Top players across EmojiTV.
+      </div>
+      <button class="secondary" style="margin-top:12px;width:100%" id="leaderboardButton">
+        VIEW LEADERBOARDS
+      </button>
+    </div>
 
-</div>
+  </div>
 
-<div class="friendSearchHome card">
-<div style="font-weight:900;font-size:18px">
-👥 Add a friend
-</div>
+  <div class="modes">
 
-<div style="color:#9faac2;font-size:13px;margin:5px 0 10px">
-Search for their username while they are online.
-</div>
+    <div class="modeCard card">
+      <div>
+        <div class="modeEmoji">🤪</div>
+        <h2>Face-Off</h2>
+        <p>
+          Get a random emoji, make the expression, and let the AI compare your face.
+          Five rounds. Highest score wins.
+        </p>
+      </div>
+      <button class="primary" id="faceStart">PLAY FACE-OFF</button>
+    </div>
 
-<div class="chatRow">
-<input
-id="friendSearchInput"
-maxlength="20"
-placeholder="Search username"
->
-<button class="primary" id="friendSearchButton">
-ADD FRIEND
-</button>
-</div>
+    <div class="modeCard card">
+      <div>
+        <div class="modeEmoji">📹</div>
+        <h2>Video Chat</h2>
+        <p>
+          Connect with a random player and chat face-to-face using your webcam and microphone.
+        </p>
+      </div>
+      <button class="primary" id="chatStart">START VIDEO CHAT</button>
+    </div>
 
-<div id="friendSearchResult" class="tiny"></div>
-</div>
+    <div class="modeCard card">
+      <div>
+        <div class="modeEmoji">🔎</div>
+        <h2>Emoji Hunt</h2>
+        <p>
+          Find the object shown by the emoji before your opponent.
+          You get 60 seconds for each item.
+        </p>
+      </div>
+      <button class="primary" id="huntStart">PLAY EMOJI HUNT</button>
+    </div>
 
-<div class="dashboardTools">
-<button class="secondary" id="friendsToggle">👥 FRIENDS</button>
-<button class="secondary" id="changeUsername">CHANGE USERNAME</button>
-<button class="secondary" id="leaderboardToggle">🏆 LEADERBOARDS</button>
-</div>
+  </div>
 
-<div class="onlinePanel">
-<div class="onlineHead">
-<h3>🟢 Online Players</h3>
-<div class="tiny" id="onlineCount">0 online</div>
-</div>
-<div class="onlineNames" id="onlineNames"></div>
-</div>
-
-<div class="leaderPanel hiddenPanel" id="leaderPanel">
-<div class="leaderHead">
-<h3>🏆 Leaderboards</h3>
-</div>
-
-<div class="leaderboards">
-
-<div class="leaderTable">
-<h4>😀 Face-Off</h4>
-<div id="faceLeaderboard"></div>
-</div>
-
-<div class="leaderTable">
-<h4>🔎 Emoji Hunt</h4>
-<div id="huntLeaderboard"></div>
-</div>
-
-<div class="leaderTable">
-<h4>📹 Video Chat</h4>
-<div id="chatLeaderboard"></div>
-</div>
-
-</div>
-</div>
-
-</div>
 </section>
 
 <section id="match" class="screen">
-
-<button class="secondary back" id="matchBack">← BACK</button>
-
-<div class="card">
-
-<div class="spinner">🎭</div>
-
-<h2 id="matchTitle" style="text-align:center">
-Finding an opponent…
-</h2>
-
-<div class="status" id="matchStatus">
-Starting…
-</div>
-
-<div class="notice" id="error"></div>
-
-<div class="videos">
-
-<div class="videoCard">
-<div class="label">YOU</div>
-<video id="localWaiting" autoplay muted playsinline></video>
-</div>
-
-<div class="videoCard opponent">
-<div class="label" id="waitingOpponentLabel">OPPONENT</div>
-<video id="remoteWaiting" autoplay playsinline></video>
-</div>
-
-</div>
-
-<div class="controls">
-<button class="secondary" id="cancel">CANCEL</button>
-<button class="primary" id="retry">RETRY</button>
-</div>
-
-</div>
+  <div class="card waiting">
+    <div>
+      <div class="spinner"></div>
+      <h2 id="waitingTitle">Finding a player...</h2>
+      <p id="waitingText" style="color:#9faac2">
+        Searching for someone to play with.
+      </p>
+      <button class="secondary" id="waitingCancel">CANCEL</button>
+    </div>
+  </div>
 </section>
 
 <section id="faceGame" class="screen">
 
-<button class="secondary back" id="faceBack">← BACK</button>
+  <div class="gameTop">
+    <div>
+      <div class="gameTitle">🤪 Face-Off</div>
+      <div class="gameSub" id="faceRoundText">Round 1 / 5</div>
+    </div>
+    <div class="controls" style="margin:0">
+      <button class="secondary" id="faceFriend">👥 ADD FRIEND</button>
+      <button class="secondary" id="faceReport">REPORT</button>
+      <button class="secondary" id="faceSkip">SKIP — PLAY SOMEONE ELSE</button>
+      <button class="danger" id="faceQuit">QUIT</button>
+    </div>
+  </div>
 
-<div class="card">
+  <div class="targetBox card">
+    <div style="color:#9faac2;font-size:13px;font-weight:900">MATCH THIS EMOJI!</div>
+    <div class="targetEmoji" id="faceEmoji">😀</div>
+    <div class="countdown" id="faceCountdown">GET READY!</div>
+    <div id="faceStatus" style="color:#aeb8ce">Waiting for the round to start...</div>
+  </div>
 
-<div class="round" id="faceRoundText">
-ROUND 1 / 5
-</div>
+  <div class="videoGrid">
 
-<div class="emoji" id="faceTarget">
-😎
-</div>
+    <div class="videoCard local">
+      <div class="videoLabel">YOU — <span id="faceYouName">Guest</span></div>
+      <video id="localFaceVideo" autoplay muted playsinline></video>
+    </div>
 
-<div class="countdown" id="faceCountdown">
-GET READY!
-</div>
+    <div class="videoCard">
+      <div class="videoLabel">OPPONENT — <span id="faceOpponentName">Opponent</span></div>
+      <video id="remoteFaceVideo" autoplay playsinline></video>
+    </div>
 
-<div class="videos">
+  </div>
 
-<div class="videoCard">
-<div class="label">YOU</div>
-<video id="localFace" autoplay muted playsinline></video>
-</div>
+  <div class="card" style="margin-top:14px">
+    <div style="display:flex;justify-content:space-between">
+      <span>Your score</span>
+      <b id="faceYourScore">0</b>
+    </div>
+    <div class="scoreBar"><div id="faceProgress"></div></div>
+    <div style="display:flex;justify-content:space-between;color:#9faac2">
+      <span>Opponent score</span>
+      <b id="faceOpponentScore">0</b>
+    </div>
+  </div>
 
-<div class="videoCard opponent">
-<div class="label" id="faceOpponentLabel">OPPONENT</div>
-<video id="remoteFace" autoplay playsinline></video>
-</div>
-
-</div>
-
-<div class="scorebar">
-<div class="score">
-YOU:
-<span class="live-score" id="faceYourScore">0</span>
-</div>
-
-<div class="score">
-<span id="faceOpponentName">OPPONENT</span>:
-<span class="live-score" id="faceOpponentScore">0</span>
-</div>
-</div>
-
-<div class="face-status" id="faceStatus"></div>
-
-<div class="result" id="faceResult"></div>
-
-<div class="controls">
-
-<button class="secondary" id="faceFriend">
-👥 ADD FRIEND
-</button>
-
-<button class="reportBtn secondary" id="faceReport">
-🚩 REPORT
-</button>
-
-<button class="secondary" id="faceSkip">
-SKIP — PLAY SOMEONE ELSE
-</button>
-
-<button class="secondary" id="faceQuit">
-QUIT
-</button>
-
-<button class="primary" id="facePlayAgain">
-🔁 PLAY AGAIN WITH THEM
-</button>
-
-</div>
-
-</div>
 </section>
 
 <section id="chatGame" class="screen">
 
-<button class="secondary back" id="chatBack">← BACK</button>
+  <div class="gameTop">
+    <div>
+      <div class="gameTitle">📹 Video Chat</div>
+      <div class="gameSub">Talking with <span id="chatOpponentName">Opponent</span></div>
+    </div>
 
-<div class="card">
+    <div class="controls" style="margin:0">
+      <button class="secondary" id="chatFriend">👥 ADD FRIEND</button>
+      <button class="secondary" id="chatReport">REPORT</button>
+      <button class="secondary" id="chatSkip">SKIP — PLAY SOMEONE ELSE</button>
+      <button class="danger" id="chatQuit">QUIT</button>
+    </div>
+  </div>
 
-<div class="round">
-VIDEO CHAT
-</div>
+  <div class="chatLayout">
 
-<div class="videos">
+    <div class="videoCard" style="min-height:470px">
+      <div class="videoLabel">
+        <span id="chatOpponentVideoName">Opponent</span>
+      </div>
+      <video id="remoteChatVideo" autoplay playsinline style="min-height:470px"></video>
+    </div>
 
-<div class="videoCard">
-<div class="label">YOU</div>
-<video id="localChat" autoplay muted playsinline></video>
-</div>
+    <div class="chatSide">
 
-<div class="videoCard opponent">
-<div class="label" id="chatOpponentLabel">OPPONENT</div>
-<video id="remoteChat" autoplay playsinline></video>
-</div>
+      <div class="videoCard" style="min-height:225px">
+        <div class="videoLabel">YOU — <span id="chatYouName">Guest</span></div>
+        <video id="localChatVideo" autoplay muted playsinline style="min-height:225px"></video>
+      </div>
 
-</div>
+      <div class="card">
+        <div id="chatMessages" class="chatMessages" style="height:220px"></div>
+        <div class="chatRow" style="margin-top:8px">
+          <input id="chatInput" maxlength="300" placeholder="Type a message...">
+          <button class="primary" id="chatSend">SEND</button>
+        </div>
+      </div>
 
-<div class="chatBox">
+    </div>
 
-<div class="messages" id="messages"></div>
+  </div>
 
-<div class="chatRow">
-<input id="chatInput" maxlength="300" placeholder="Type a message">
-<button class="primary" id="chatSend">SEND</button>
-</div>
-
-</div>
-
-<div class="controls">
-
-<button class="secondary" id="chatFriend">
-👥 ADD FRIEND
-</button>
-
-<button class="reportBtn secondary" id="chatReport">
-🚩 REPORT
-</button>
-
-<button class="secondary" id="chatSkip">
-SKIP — PLAY SOMEONE ELSE
-</button>
-
-<button class="secondary" id="chatQuit">
-QUIT
-</button>
-
-<button class="primary" id="chatPlayAgain">
-🔁 PLAY AGAIN WITH THEM
-</button>
-
-</div>
-
-</div>
 </section>
 
 <section id="huntGame" class="screen">
 
-<button class="secondary back" id="huntBack">← BACK</button>
+  <div class="gameTop">
+    <div>
+      <div class="gameTitle">🔎 Emoji Hunt</div>
+      <div class="gameSub" id="huntRoundText">Round 1 / 10</div>
+    </div>
 
-<div class="card">
+    <div class="controls" style="margin:0">
+      <button class="secondary" id="huntFriend">👥 ADD FRIEND</button>
+      <button class="secondary" id="huntReport">REPORT</button>
+      <button class="secondary" id="huntSkipItem">⏭️ SKIP ITEM</button>
+      <button class="secondary" id="huntSkip">SKIP — PLAY SOMEONE ELSE</button>
+      <button class="danger" id="huntQuit">QUIT</button>
+    </div>
+  </div>
 
-<div class="round" id="huntRoundText">
-ROUND 1 / 10
-</div>
+  <div class="targetBox card">
+    <div style="color:#9faac2;font-size:13px;font-weight:900">
+      FIND THIS OBJECT!
+    </div>
 
-<div class="huntTarget">
-<div class="emoji" id="huntTargetEmoji">🔎</div>
+    <div class="targetEmoji" id="huntEmoji">🧻</div>
 
-<div>
-<div class="targetName" id="huntTargetName">
-Find it!
-</div>
+    <div class="targetText" id="huntTargetText">
+      toilet paper
+    </div>
 
-<div class="cameraHint">
-Hold the object clearly in front of your camera.
-</div>
-</div>
-</div>
+    <div class="countdown" id="huntCountdown">
+      GO FIND IT! — 60s
+    </div>
 
-<div class="countdown" id="huntCountdown">
-GO FIND IT! — 60s
-</div>
+    <div id="huntStatus" style="color:#aeb8ce">
+      AI is getting ready...
+    </div>
 
-<div class="videos">
+    <div class="scoreBar">
+      <div id="huntProgress"></div>
+    </div>
 
-<div class="videoCard">
-<div class="label">YOU</div>
-<video id="localHunt" autoplay muted playsinline></video>
-</div>
+    <div id="huntSkipStatus" class="skipStatus"></div>
+  </div>
 
-<div class="videoCard opponent">
-<div class="label" id="huntOpponentLabel">OPPONENT</div>
-<video id="remoteHunt" autoplay playsinline></video>
-</div>
+  <div class="videoGrid">
 
-</div>
+    <div class="videoCard local">
+      <div class="videoLabel">
+        YOU — <span id="huntYouName">Guest</span>
+      </div>
+      <video id="localHuntVideo" autoplay muted playsinline></video>
+    </div>
 
-<div class="scorebar">
+    <div class="videoCard">
+      <div class="videoLabel">
+        OPPONENT — <span id="huntOpponentName">Opponent</span>
+      </div>
+      <video id="remoteHuntVideo" autoplay playsinline></video>
+    </div>
 
-<div class="score">
-YOU:
-<span class="live-score" id="huntYourScore">0</span>
-</div>
+  </div>
 
-<div class="score">
-<span id="huntOpponentName">OPPONENT</span>:
-<span class="live-score" id="huntOpponentScore">0</span>
-</div>
+  <div class="card" style="margin-top:14px">
+    <div style="display:flex;justify-content:space-between">
+      <span>Your Hunt wins</span>
+      <b id="huntYourScore">0</b>
+    </div>
 
-</div>
+    <div style="display:flex;justify-content:space-between;color:#9faac2;margin-top:7px">
+      <span>Opponent Hunt wins</span>
+      <b id="huntOpponentScore">0</b>
+    </div>
+  </div>
 
-<div class="huntPanel">
+  <div class="resultBox card hidden" id="huntResult"></div>
 
-<div class="hunt-status" id="huntStatus">
-Starting AI scanner…
-</div>
-
-<div class="progress">
-<div id="huntProgress"></div>
-</div>
-
-</div>
-
-<div class="result" id="huntResult"></div>
-
-<div class="controls">
-
-<button class="secondary" id="huntFriend">
-👥 ADD FRIEND
-</button>
-
-<button class="secondary" id="huntSkipItem">
-⏭️ SKIP ITEM
-</button>
-
-<button class="secondary" id="huntSkip">
-SKIP — PLAY SOMEONE ELSE
-</button>
-
-<button class="reportBtn secondary" id="huntReport">
-🚩 REPORT
-</button>
-
-<button class="secondary" id="huntQuit">
-QUIT
-</button>
-
-<button class="primary" id="huntPlayAgain">
-🔁 PLAY AGAIN WITH THEM
-</button>
-
-</div>
-
-<div class="tiny">
-Both players must press SKIP ITEM to change the current object.
-</div>
-
-</div>
 </section>
 
-<footer class="footer">
-<div>Made by Tyler L</div>
-<div class="made-with-heart">
-🎭 EmojiTV
+<div id="friendsPanel" class="reportModal hidden">
+  <div class="modal card">
+
+    <div class="gameTop">
+      <h2 style="margin:0">👥 Friends</h2>
+      <button class="secondary" id="closeFriends">CLOSE</button>
+    </div>
+
+    <div id="friendNotice"></div>
+
+    <div style="margin-top:12px">
+      <div style="font-weight:900">Friend requests</div>
+      <div id="friendRequests" class="friendsList"></div>
+    </div>
+
+    <div style="margin-top:18px">
+      <div style="font-weight:900">Your friends</div>
+      <div id="friendsList" class="friendsList"></div>
+    </div>
+
+  </div>
 </div>
+
+<div id="dmPanel" class="reportModal hidden">
+  <div class="modal card">
+
+    <div class="gameTop">
+      <h2 style="margin:0">
+        💬 Messages with <span id="dmTitle">Friend</span>
+      </h2>
+      <button class="secondary" id="closeDm">CLOSE</button>
+    </div>
+
+    <div id="dmMessages" class="chatMessages" style="height:330px"></div>
+
+    <div class="chatRow" style="margin-top:10px">
+      <input id="dmInput" maxlength="300" placeholder="Message your friend...">
+      <button class="primary" id="dmSend">SEND</button>
+    </div>
+
+  </div>
+</div>
+
+<div id="leaderboardPanel" class="reportModal hidden">
+  <div class="modal card">
+
+    <div class="gameTop">
+      <h2 style="margin:0">🏆 Leaderboards</h2>
+      <button class="secondary" id="closeLeaderboard">CLOSE</button>
+    </div>
+
+    <h3>🤪 Face-Off</h3>
+    <table class="leaderboard">
+      <thead>
+        <tr><th>#</th><th>Player</th><th>Wins</th><th>Points</th></tr>
+      </thead>
+      <tbody id="faceLeaderboard"></tbody>
+    </table>
+
+    <h3>🔎 Emoji Hunt</h3>
+    <table class="leaderboard">
+      <thead>
+        <tr><th>#</th><th>Player</th><th>Wins</th><th>Points</th></tr>
+      </thead>
+      <tbody id="huntLeaderboard"></tbody>
+    </table>
+
+    <h3>📹 Video Chat</h3>
+    <table class="leaderboard">
+      <thead>
+        <tr><th>#</th><th>Player</th><th>Games</th><th>Points</th></tr>
+      </thead>
+      <tbody id="chatLeaderboard"></tbody>
+    </table>
+
+  </div>
+</div>
+
+<div id="reportModal" class="reportModal hidden">
+  <div class="modal card">
+
+    <h2>🚩 Report Player</h2>
+
+    <p style="color:#9faac2">
+      Tell us what happened. Reports are stored by the game server.
+    </p>
+
+    <label>Reason</label>
+    <select id="reportReason" style="width:100%;margin-top:6px">
+      <option value="harassment">Harassment</option>
+      <option value="sexual-content">Sexual content</option>
+      <option value="hate">Hate</option>
+      <option value="threats">Threats</option>
+      <option value="spam">Spam</option>
+      <option value="privacy">Privacy</option>
+      <option value="other">Other</option>
+    </select>
+
+    <label style="display:block;margin-top:12px">Details</label>
+    <textarea id="reportDetails" maxlength="1000" placeholder="What happened?"></textarea>
+
+    <div id="reportStatus"></div>
+
+    <div class="modalActions">
+      <button class="secondary" id="closeReport">CANCEL</button>
+      <button class="danger" id="submitReport">SUBMIT REPORT</button>
+    </div>
+
+  </div>
+</div>
+
+<div id="nameGate" class="nameGate hidden">
+  <div class="modal card">
+
+    <h2>👋 Choose your username</h2>
+
+    <p style="color:#9faac2">
+      Other players will see this name.
+    </p>
+
+    <input id="usernameInput" maxlength="20" placeholder="Your username" style="width:100%">
+
+    <div id="nameError"></div>
+
+    <div class="modalActions">
+      <button class="primary" id="saveName">CONTINUE</button>
+    </div>
+
+  </div>
+</div>
+
+<div id="inviteModal" class="inviteModal hidden">
+  <div class="modal card">
+
+    <h2>🎮 Game Invite</h2>
+
+    <p>
+      <b id="inviteFrom">Someone</b> invited you to play.
+    </p>
+
+    <p style="color:#9faac2">
+      Mode: <b id="inviteMode">Face-Off</b>
+    </p>
+
+    <div class="modalActions">
+      <button class="secondary" id="declineInvite">DECLINE</button>
+      <button class="primary" id="acceptInvite">ACCEPT</button>
+    </div>
+
+  </div>
+</div>
+
+<button class="primary dashboardShare" id="dashboardShare">📤 SHARE</button>
+
+<footer class="footer">
+  Made by Tyler L<br>
+  <span class="made-with-heart">Made with ❤️</span>
 </footer>
 
-</div>
-
-<div id="friendsModal" class="reportModal" aria-hidden="true">
-<div class="reportCard">
-
-<h2>👥 Friends</h2>
-
-<div id="friendNotice" class="reportSuccess"></div>
-
-<div id="pendingFriends"></div>
-
-<div id="friendsList"></div>
-
-<div class="reportActions">
-<button class="secondary" id="friendsClose">CLOSE</button>
-</div>
-
-</div>
 </div>
 
 <script type="module">
 
 const $ = id => document.getElementById(id);
 
-const TOTAL_FACE = 5;
-const TOTAL_HUNT = 10;
-const HUNT_SECONDS = 60;
-
-let username =
-localStorage.getItem("emojiTVUsername") || "";
+const screens = [
+  "home",
+  "match",
+  "faceGame",
+  "chatGame",
+  "huntGame"
+];
 
 let stream = null;
 let ws = null;
 let pc = null;
-
 let role = null;
 let currentMode = null;
 let connecting = false;
-
 let roundToken = 0;
 let scoreTimer = null;
 let animationFrame = null;
-
 let roundActive = false;
 let lastScore = 0;
 
 let faceLandmarker = null;
 let objectMatcher = null;
 let objectMatcherLoading = null;
-
 let huntScanning = false;
 let huntFoundLocal = false;
 
-let rematchSent = false;
+const TOTAL_FACE = 5;
+const TOTAL_HUNT = 10;
+const HUNT_SECONDS = 60;
 
+let rematchSent = false;
 let dmWith = "";
 let huntTimer = null;
 let huntTimeLeft = HUNT_SECONDS;
 let huntConfirmations = 0;
 
+let username =
+  localStorage.getItem("emojitv_username") || "";
+
 let opponentUsername = "";
 
 let reportMode = "";
 
-let leaderboards = {
-face: [],
-hunt: [],
-chat: []
+const leaderboards = {
+  face: [],
+  hunt: [],
+  chat: []
 };
 
-function setUsername(name){
-username = String(name || "").trim().slice(0,20);
+function setUsername(name) {
 
-if(username){
-localStorage.setItem("emojiTVUsername",username);
-}
-}
+  username = String(name || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0,20);
 
-function showNameGate(){
-$("nameGate").classList.remove("hidden");
-setTimeout(()=>$("usernameInput").focus(),50);
-}
+  if (!username) username = "Guest";
 
-function hideNameGate(){
-$("nameGate").classList.add("hidden");
-}
+  localStorage.setItem(
+    "emojitv_username",
+    username
+  );
 
-function renderOnline(data){
-$("onlineCount").textContent =
-`${data.count || 0} online`;
+  $("currentUsername").textContent = username;
+  $("usernameInput").value = username;
 
-$("onlineNames").innerHTML =
-(data.names || [])
-.map(name=>`<span class="onlineName">${escapeHtml(name)}</span>`)
-.join("");
+  $("faceYouName").textContent = username;
+  $("chatYouName").textContent = username;
+  $("huntYouName").textContent = username;
 }
 
-function renderFriends(data){
-const pending =
-data.pending || [];
-
-$("pendingFriends").innerHTML =
-pending.length
-? `<div style="font-weight:900;margin-bottom:8px">Friend Requests</div>`+
-pending.map(name=>`
-<div class="friendRow">
-<div class="friendRowName">${escapeHtml(name)}</div>
-<div class="friendActions">
-<button class="primary" onclick="window.acceptFriend(${JSON.stringify(name)})">ACCEPT</button>
-</div>
-</div>`).join("")
-: "";
-
-$("friendsList").innerHTML =
-(data.friends || []).length
-? `<div style="font-weight:900;margin:12px 0 8px">Your Friends</div>`+
-(data.friends || []).map(friend=>`
-<div class="friendRow">
-<div>
-<div class="friendRowName">${escapeHtml(friend.username)}</div>
-<div class="tiny" style="text-align:left">${friend.online?"🟢 Online":"⚪ Offline"}</div>
-</div>
-
-<div class="friendActions">
-
-${
-friend.online
-? `
-<button class="secondary" onclick="window.inviteFriend(${JSON.stringify(friend.username)} ,'face')">
-FACE
-</button>
-
-<button class="secondary" onclick="window.inviteFriend(${JSON.stringify(friend.username)} ,'hunt')">
-HUNT
-</button>
-
-<button class="secondary" onclick="window.inviteFriend(${JSON.stringify(friend.username)} ,'chat')">
-CHAT
-</button>
-`
-:""
+function showNameGate() {
+  $("nameGate").classList.remove("hidden");
+  $("usernameInput").focus();
 }
 
-<button class="secondary" onclick="window.openFriendDm(${JSON.stringify(friend.username)})">
-MESSAGE
-</button>
-
-</div>
-</div>`).join("")
-: `<div class="tiny">No friends yet.</div>`;
+function hideNameGate() {
+  $("nameGate").classList.add("hidden");
 }
 
-function requestFriends(){
-if(ws?.readyState===1){
-ws.send(JSON.stringify({
-type:"get-friends"
-}));
-}
-}
+function renderOnline(m) {
 
-function sendFriendRequestTo(name,resultEl){
-const to=String(name||"").trim();
+  $("onlineCountLarge").textContent =
+    m.count ?? 0;
 
-if(!to || to===username){
-if(resultEl){
-resultEl.textContent="Enter another player's username.";
-}
-return;
+  const names = m.names || [];
+
+  $("onlineNames").innerHTML =
+    names.length
+      ? names.map(name =>
+          `<span class="onlineName">${escapeHtml(name)}</span>`
+        ).join("")
+      : `<span class="tiny">Nobody else is online yet.</span>`;
 }
 
-if(ws?.readyState!==1){
-if(resultEl){
-resultEl.textContent="Connecting…";
-}
-return;
-}
+function renderFriends(m) {
 
-ws.send(JSON.stringify({
-type:"friend-request",
-to
-}));
+  const requests = m.pending || [];
+  const friends = m.friends || [];
 
-if(resultEl){
-resultEl.textContent=`Friend request sent to ${to}.`;
-}
-}
+  $("friendRequests").innerHTML =
+    requests.length
+      ? requests.map(name => `
+        <div class="friendRow">
+          <div>
+            <b>${escapeHtml(name)}</b>
+            <div class="tiny">Wants to be your friend</div>
+          </div>
+          <button
+            class="primary"
+            data-accept-friend="${escapeHtml(name)}">
+            ACCEPT
+          </button>
+        </div>
+      `).join("")
+      : `<div class="tiny">No pending friend requests.</div>`;
 
-function addCurrentOpponentAsFriend(){
-sendFriendRequestTo(
-opponentUsername,
-$("friendNotice")
-);
-}
+  $("friendsList").innerHTML =
+    friends.length
+      ? friends.map(f => `
+        <div class="friendRow">
+          <div>
+            <b>${escapeHtml(f.username)}</b>
+            <div class="${f.online ? "friendOnline" : "friendOffline"}">
+              ${f.online ? "● Online" : "● Offline"}
+            </div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button
+              class="secondary"
+              data-message-friend="${escapeHtml(f.username)}">
+              💬
+            </button>
+            ${
+              f.online
+              ? `<button
+                  class="secondary"
+                  data-invite-friend="${escapeHtml(f.username)}">
+                  🎮
+                </button>`
+              : ""
+            }
+          </div>
+        </div>
+      `).join("")
+      : `<div class="tiny">No friends yet.</div>`;
 
-window.acceptFriend = function(name){
-if(ws?.readyState===1){
-ws.send(JSON.stringify({
-type:"friend-accept",
-from:name
-}));
-}
-};
+  document.querySelectorAll("[data-accept-friend]")
+    .forEach(btn => {
+      btn.onclick = () =>
+        sendFriendAccept(btn.dataset.acceptFriend);
+    });
 
-window.inviteFriend = function(name,mode){
-if(ws?.readyState===1){
-ws.send(JSON.stringify({
-type:"friend-invite",
-to:name,
-mode
-}));
-}
-};
+  document.querySelectorAll("[data-message-friend]")
+    .forEach(btn => {
+      btn.onclick = () =>
+        openDm(btn.dataset.messageFriend);
+    });
 
-window.openFriendDm = function(name){
-dmWith=name;
-openFriends();
-$("dmInput").value="";
-requestFriends();
-
-if(ws?.readyState===1){
-ws.send(JSON.stringify({
-type:"get-dm-history",
-to:name
-}));
-}
-};
-
-function showGameInvite(m){
-if(!m)return;
-
-const box=document.createElement("div");
-
-box.className="inviteBox";
-
-box.innerHTML=`
-<strong>🎮 ${escapeHtml(m.from)} invited you to play.</strong>
-<div style="color:#9faac2;margin-top:4px">
-Mode: ${escapeHtml(m.mode)}
-</div>
-
-<div class="inviteActions">
-
-<button class="primary">
-ACCEPT
-</button>
-
-<button class="secondary">
-DECLINE
-</button>
-
-</div>
-`;
-
-const actions=box.querySelectorAll("button");
-
-actions[0].onclick=()=>{
-if(ws?.readyState===1){
-ws.send(JSON.stringify({
-type:"accept-invite",
-inviteId:m.inviteId
-}));
+  document.querySelectorAll("[data-invite-friend]")
+    .forEach(btn => {
+      btn.onclick = () =>
+        sendGameInvite(
+          btn.dataset.inviteFriend,
+          currentMode || "face"
+        );
+    });
 }
 
-box.remove();
-};
+function requestFriends() {
 
-actions[1].onclick=()=>{
-if(ws?.readyState===1){
-ws.send(JSON.stringify({
-type:"decline-invite",
-inviteId:m.inviteId
-}));
+  if (ws?.readyState === 1) {
+    ws.send(JSON.stringify({
+      type: "get-friends"
+    }));
+  }
 }
 
-box.remove();
-};
+function sendFriendRequestTo(name, resultEl) {
 
-$("friendNotice").textContent="";
-$("friendNotice").classList.remove("show");
+  const to = String(name || "").trim();
 
-$("pendingFriends").prepend(box);
+  if (!to || to === username) {
 
-openFriends();
+    if (resultEl) {
+      resultEl.textContent =
+        "Enter another player's username.";
+    }
+
+    return;
+  }
+
+  if (ws?.readyState !== 1) {
+
+    if (resultEl) {
+      resultEl.textContent = "Connecting…";
+    }
+
+    return;
+  }
+
+  ws.send(JSON.stringify({
+    type: "friend-request",
+    to
+  }));
+
+  if (resultEl) {
+    resultEl.textContent =
+      `Friend request sent to ${to}.`;
+  }
 }
 
-function openFriends(){
-$("friendsModal").classList.add("show");
-$("friendsModal").setAttribute("aria-hidden","false");
-requestFriends();
+function sendFriendAccept(from) {
+
+  if (ws?.readyState !== 1) return;
+
+  ws.send(JSON.stringify({
+    type: "friend-accept",
+    from
+  }));
 }
 
-function closeFriends(){
-$("friendsModal").classList.remove("show");
-$("friendsModal").setAttribute("aria-hidden","true");
+function addCurrentOpponentAsFriend() {
+
+  sendFriendRequestTo(
+    opponentUsername,
+    $("friendNotice")
+  );
 }
 
-function renderDmHistory(messages){
-const area=$("messages");
+function sendGameInvite(to, mode) {
 
-area.innerHTML="";
+  if (ws?.readyState !== 1) return;
 
-for(const m of messages||[]){
-appendDm({
-...m,
-self:m.from===username
-});
+  ws.send(JSON.stringify({
+    type: "friend-invite",
+    to,
+    mode
+  }));
 }
 
-area.scrollTop=area.scrollHeight;
+function showGameInvite(message) {
+
+  $("inviteFrom").textContent =
+    message.from;
+
+  $("inviteMode").textContent =
+    message.mode === "hunt"
+      ? "Emoji Hunt"
+      : message.mode === "chat"
+        ? "Video Chat"
+        : "Face-Off";
+
+  $("inviteModal").classList.remove("hidden");
+
+  $("acceptInvite").dataset.inviteId =
+    message.inviteId;
+
+  $("declineInvite").dataset.inviteId =
+    message.inviteId;
 }
 
-function appendDm(m){
-if(m.from!==dmWith && !m.self)return;
+function acceptGameInvite() {
 
-const div=document.createElement("div");
+  const inviteId =
+    $("acceptInvite").dataset.inviteId;
 
-div.className="msg"+(m.self?" self":"");
+  if (!inviteId || ws?.readyState !== 1) return;
 
-div.textContent =
-(m.self?"You: ":`${m.from}: `)+
-m.text;
+  $("inviteModal").classList.add("hidden");
 
-$("messages").appendChild(div);
-
-$("messages").scrollTop=
-$("messages").scrollHeight;
+  ws.send(JSON.stringify({
+    type: "accept-invite",
+    inviteId
+  }));
 }
 
-function sendDm(){
-const input=$("dmInput");
-const text=input.value.trim();
+function declineGameInvite() {
 
-if(
-!text ||
-!dmWith ||
-ws?.readyState!==1
-){
-return;
+  const inviteId =
+    $("declineInvite").dataset.inviteId;
+
+  if (!inviteId || ws?.readyState !== 1) return;
+
+  $("inviteModal").classList.add("hidden");
+
+  ws.send(JSON.stringify({
+    type: "decline-invite",
+    inviteId
+  }));
 }
 
-ws.send(JSON.stringify({
-type:"dm",
-to:dmWith,
-text
-}));
+function openFriends() {
 
-input.value="";
+  $("friendsPanel").classList.remove("hidden");
+  requestFriends();
 }
 
-function renderLeaderboard(mode,rows){
-leaderboards[mode]=rows||[];
-
-const el=$(`${mode}Leaderboard`);
-
-if(!rows?.length){
-el.innerHTML=`<div class="leaderEmpty">No games recorded yet.</div>`;
-return;
+function closeFriends() {
+  $("friendsPanel").classList.add("hidden");
 }
 
-el.innerHTML=rows.map(row=>`
-<div class="leaderRow">
-<div>#${row.rank}</div>
-<div>${escapeHtml(row.username)}</div>
-<div>${row.wins}W</div>
-</div>
-`).join("");
+function openDm(name) {
+
+  dmWith = name;
+
+  $("dmTitle").textContent = name;
+
+  $("dmMessages").innerHTML =
+    `<div class="tiny">Loading messages...</div>`;
+
+  $("dmPanel").classList.remove("hidden");
+
+  if (ws?.readyState === 1) {
+    ws.send(JSON.stringify({
+      type: "get-dm-history",
+      to: name
+    }));
+  }
 }
 
-function requestLeaderboards(){
-if(ws?.readyState===1){
-ws.send(JSON.stringify({
-type:"get-leaderboards"
-}));
-}
-}
+function renderDmHistory(messages) {
 
-function escapeHtml(value){
-return String(value??"")
-.replace(/&/g,"&amp;")
-.replace(/</g,"&lt;")
-.replace(/>/g,"&gt;")
-.replace(/"/g,"&quot;")
-.replace(/'/g,"&#039;");
-}
+  const box = $("dmMessages");
 
-function openReport(mode){
-reportMode=mode||currentMode||"";
+  box.innerHTML =
+    messages.length
+      ? messages.map(m => `
+        <div class="message ${m.from === username ? "self" : ""}">
+          <b>${escapeHtml(m.from)}</b><br>
+          ${escapeHtml(m.text)}
+        </div>
+      `).join("")
+      : `<div class="tiny">No messages yet.</div>`;
 
-$("reportMeta").textContent =
-`Connected player: ${opponentUsername||"Unknown"}`;
-
-$("reportDetails").value="";
-$("reportSuccess").classList.remove("show");
-$("reportModal").classList.add("show");
-$("reportModal").setAttribute("aria-hidden","false");
+  box.scrollTop = box.scrollHeight;
 }
 
-function closeReport(){
-$("reportModal").classList.remove("show");
-$("reportModal").setAttribute("aria-hidden","true");
+function appendDm(m) {
+
+  const box = $("dmMessages");
+
+  const div =
+    document.createElement("div");
+
+  div.className =
+    "message " +
+    (m.from === username ? "self" : "");
+
+  div.innerHTML =
+    `<b>${escapeHtml(m.from)}</b><br>${escapeHtml(m.text)}`;
+
+  box.appendChild(div);
+
+  box.scrollTop = box.scrollHeight;
 }
 
-function submitReport(){
-if(ws?.readyState!==1){
-return;
+function sendDm() {
+
+  const text =
+    $("dmInput").value.trim();
+
+  if (!text || !dmWith || ws?.readyState !== 1) {
+    return;
+  }
+
+  ws.send(JSON.stringify({
+    type: "dm",
+    to: dmWith,
+    text
+  }));
+
+  $("dmInput").value = "";
 }
 
-ws.send(JSON.stringify({
-type:"report",
-mode:reportMode,
-reason:$("reportReason").value,
-details:$("reportDetails").value
-}));
+function renderLeaderboard(mode, rows) {
+
+  leaderboards[mode] = rows || [];
+
+  const target =
+    mode === "face"
+      ? $("faceLeaderboard")
+      : mode === "hunt"
+        ? $("huntLeaderboard")
+        : $("chatLeaderboard");
+
+  target.innerHTML =
+    rows?.length
+      ? rows.map(row => `
+        <tr>
+          <td>${row.rank}</td>
+          <td>${escapeHtml(row.username)}</td>
+          <td>${row.wins ?? row.games ?? 0}</td>
+          <td>${row.points ?? 0}</td>
+        </tr>
+      `).join("")
+      : `<tr><td colspan="4">No games yet.</td></tr>`;
 }
 
-function wsUrl(){
-return location.protocol==="https:"
-?`wss://${location.host}`
-:`ws://${location.host}`;
+function requestLeaderboards() {
+
+  if (ws?.readyState === 1) {
+    ws.send(JSON.stringify({
+      type: "get-leaderboards"
+    }));
+  }
 }
 
-async function getCameraAndMic(){
-if(!window.isSecureContext &&
-location.hostname!=="localhost" &&
-location.hostname!=="127.0.0.1"){
-throw new Error("secure");
+function escapeHtml(value) {
+
+  return String(value ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
 }
 
-stream=await navigator.mediaDevices.getUserMedia({
-video:{
-width:{ideal:1280},
-height:{ideal:720},
-facingMode:"user"
-},
-audio:true
-});
+function openReport(mode) {
 
-setLocalVideos();
+  reportMode = mode;
+
+  $("reportReason").value = "harassment";
+  $("reportDetails").value = "";
+  $("reportStatus").innerHTML = "";
+
+  $("reportModal").classList.remove("hidden");
 }
 
-function setLocalVideos(){
-for(const id of [
-"localWaiting",
-"localFace",
-"localChat",
-"localHunt"
-]){
-const video=$(id);
-
-if(video){
-video.srcObject=stream;
-}
-}
+function closeReport() {
+  $("reportModal").classList.add("hidden");
 }
 
-function stopCamera(){
-if(stream){
-for(const track of stream.getTracks()){
-track.stop();
+function submitReport() {
+
+  if (ws?.readyState !== 1) {
+    $("reportStatus").innerHTML =
+      `<div class="error">Not connected.</div>`;
+    return;
+  }
+
+  ws.send(JSON.stringify({
+    type: "report",
+    mode: reportMode,
+    reason: $("reportReason").value,
+    details: $("reportDetails").value
+  }));
 }
 
-stream=null;
+function show(screen) {
+
+  screens.forEach(id => {
+    $(id).classList.toggle(
+      "active",
+      id === screen
+    );
+  });
 }
 
-for(const id of [
-"localWaiting",
-"localFace",
-"localChat",
-"localHunt"
-]){
-const video=$(id);
-
-if(video){
-video.srcObject=null;
-}
-}
+function clearError() {
+  $("globalError").innerHTML = "";
 }
 
-async function loadFaceScoring(){
-if(faceLandmarker)return;
+function setError(text) {
 
-try{
-const vision=await import(
-"https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/vision_bundle.mjs"
-);
-
-const {
-FaceLandmarker,
-FilesetResolver
-}=vision;
-
-const fileset=await FilesetResolver.forVisionTasks(
-"https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/wasm"
-);
-
-faceLandmarker=await FaceLandmarker.createFromOptions(
-fileset,
-{
-baseOptions:{
-modelAssetPath:
-"https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
-},
-runningMode:"VIDEO",
-numFaces:1
-}
-);
-
-}catch(err){
-console.error("Face AI failed",err);
-$("faceStatus").textContent=
-"Face AI could not load. Try refreshing.";
-}
+  $("globalError").innerHTML =
+    text
+      ? `<div class="error">${escapeHtml(text)}</div>`
+      : "";
 }
 
-function blend(a,b,t){
-return a+(b-a)*t;
+function wsUrl() {
+
+  const protocol =
+    location.protocol === "https:"
+      ? "wss:"
+      : "ws:";
+
+  return protocol +
+    "//" +
+    location.host;
 }
 
-function expressionScore(){
-if(!faceLandmarker || !stream)return 0;
+async function getCameraAndMic() {
 
-const video=$("localFace");
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error(
+      "Your browser does not support camera and microphone access."
+    );
+  }
 
-if(!video || video.readyState<2)return 0;
+  stream =
+    await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+      audio: true
+    });
 
-try{
-const result=
-faceLandmarker.detectForVideo(
-video,
-performance.now()
-);
-
-if(!result.faceLandmarks?.length){
-return 0;
+  return stream;
 }
 
-const lm=result.faceLandmarks[0];
+function stopCamera() {
 
-const mouthOpen=Math.abs(
-lm[13].y-lm[14].y
-);
+  if (stream) {
+    stream.getTracks().forEach(
+      track => track.stop()
+    );
+  }
 
-const brow=Math.abs(
-lm[70].y-lm[105].y
-);
+  stream = null;
 
-const mouthWidth=Math.abs(
-lm[61].x-lm[291].x
-);
-
-const target=$("faceTarget").textContent;
-
-let targetScore=50;
-
-if(
-target.includes("😮")||
-target.includes("😲")||
-target.includes("😱")
-){
-targetScore=
-mouthOpen>0.055
-?90
-:Math.max(0,90-mouthOpen*700);
+  $("localFaceVideo").srcObject = null;
+  $("localChatVideo").srcObject = null;
+  $("localHuntVideo").srcObject = null;
 }
 
-if(
-target.includes("😄")||
-target.includes("😁")||
-target.includes("😀")||
-target.includes("😂")
-){
-targetScore=
-mouthWidth>0.12
-?90
-:Math.max(0,90-mouthWidth*500);
+function setLocalVideos() {
+
+  $("localFaceVideo").srcObject = stream;
+  $("localChatVideo").srcObject = stream;
+  $("localHuntVideo").srcObject = stream;
 }
 
-if(
-target.includes("😠")||
-target.includes("😡")||
-target.includes("🤬")
-){
-targetScore=
-brow>0.045
-?90
-:Math.max(0,90-brow*800);
+async function loadFaceScoring() {
+
+  if (faceLandmarker) return;
+
+  const vision = await import(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/vision_bundle.mjs"
+  );
+
+  const {
+    FaceLandmarker,
+    FilesetResolver
+  } = vision;
+
+  const fileset =
+    await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/wasm"
+    );
+
+  faceLandmarker =
+    await FaceLandmarker.createFromOptions(
+      fileset,
+      {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+          delegate: "GPU"
+        },
+        runningMode: "VIDEO",
+        numFaces: 1
+      }
+    );
 }
 
-return Math.round(
-Math.max(0,Math.min(100,targetScore))
-);
-
-}catch{
-return 0;
-}
+function blend(a,b,t) {
+  return a + (b-a)*t;
 }
 
-function startFaceScoring(){
-stopFaceScoring();
+function expressionScore(a,b) {
 
-roundActive=true;
+  if (!a || !b) return 0;
 
-scoreTimer=setInterval(()=>{
-if(!roundActive)return;
+  let sum = 0;
+  let count = 0;
 
-const score=expressionScore();
+  const length =
+    Math.min(a.length,b.length);
 
-$("faceStatus").textContent=
-`AI expression match: ${score}%`;
+  for(let i=0;i<length;i++){
 
-lastScore=score;
-},180);
+    const dx =
+      a[i].x - b[i].x;
+
+    const dy =
+      a[i].y - b[i].y;
+
+    const d =
+      Math.sqrt(dx*dx+dy*dy);
+
+    sum += Math.max(0,1-d*5);
+    count++;
+  }
+
+  return count
+    ? Math.round((sum/count)*100)
+    : 0;
+}
+
+function normalizeFace(landmarks) {
+
+  if (!landmarks?.length) return null;
+
+  const nose =
+    landmarks[1] || landmarks[0];
+
+  return landmarks.map(p => ({
+    x: p.x - nose.x,
+    y: p.y - nose.y
+  }));
+}
+
+async function startFaceScoring(token) {
+
+  try {
+
+    await loadFaceScoring();
+
+  } catch(e) {
+
+    $("faceStatus").textContent =
+      "AI face tracking could not load. Try refreshing the page.";
+
+    return;
+  }
+
+  if(token !== roundToken) return;
+
+  let startedAt = performance.now();
+
+  const loop = () => {
+
+    if(token !== roundToken || !roundActive){
+      return;
+    }
+
+    const now = performance.now();
+
+    if(now - startedAt > 5000){
+      finishFaceRound(token);
+      return;
+    }
+
+    try {
+
+      const result =
+        faceLandmarker.detectForVideo(
+          $("localFaceVideo"),
+          now
+        );
+
+      const landmarks =
+        result.faceLandmarks?.[0];
+
+      if(landmarks){
+
+        const normalized =
+          normalizeFace(landmarks);
+
+        lastScore =
+          Math.max(
+            0,
+            Math.min(
+              100,
+              expressionScore(
+                normalized,
+                normalized
+              )
+            )
+          );
+
+        $("faceProgress").style.width =
+          lastScore + "%";
+
+      }
+
+    } catch(e){}
+
+    animationFrame =
+      requestAnimationFrame(loop);
+  };
+
+  loop();
 }
 
 function stopFaceScoring(){
-roundActive=false;
 
-if(scoreTimer){
-clearInterval(scoreTimer);
-scoreTimer=null;
+  if(animationFrame){
+    cancelAnimationFrame(
+      animationFrame
+    );
+
+    animationFrame = null;
+  }
+
+  if(scoreTimer){
+    clearTimeout(scoreTimer);
+    scoreTimer = null;
+  }
 }
 
-if(animationFrame){
-cancelAnimationFrame(animationFrame);
-animationFrame=null;
-}
-}
+function runFaceRound(token){
 
-function runFaceRound(round,target){
-roundToken++;
+  roundActive = false;
+  stopFaceScoring();
 
-const token=roundToken;
+  $("faceCountdown").textContent =
+    "GET READY!";
 
-stopFaceScoring();
+  setTimeout(() => {
 
-$("faceRoundText").textContent=
-`ROUND ${round} / ${TOTAL_FACE}`;
+    if(token !== roundToken) return;
 
-$("faceTarget").textContent=
-target||"😎";
+    let count = 5;
 
-$("faceCountdown").textContent=
-"GET READY!";
+    $("faceCountdown").textContent =
+      count;
 
-$("faceResult").textContent="";
+    const timer =
+      setInterval(() => {
 
-$("faceYourScore").textContent="—";
-$("faceOpponentScore").textContent="—";
+        if(token !== roundToken){
+          clearInterval(timer);
+          return;
+        }
 
-let n=5;
+        count--;
 
-const timer=setInterval(()=>{
-if(token!==roundToken){
-clearInterval(timer);
-return;
-}
+        if(count <= 0){
 
-$("faceCountdown").textContent=
-n>0
-?String(n)
-:"GO!";
+          clearInterval(timer);
 
-n--;
+          $("faceCountdown").textContent =
+            "GO!";
 
-if(n<0){
-clearInterval(timer);
+          $("faceStatus").textContent =
+            "Make the expression!";
 
-$("faceCountdown").textContent=
-"MAKE THE FACE! — 10s";
+          roundActive = true;
 
-startFaceScoring();
+          startFaceScoring(token);
 
-setTimeout(()=>{
-if(token!==roundToken)return;
+          scoreTimer =
+            setTimeout(
+              () => finishFaceRound(token),
+              10000
+            );
 
-finishFaceRound(token);
-},10000);
-}
+        }else{
 
-},1000);
+          $("faceCountdown").textContent =
+            count;
+        }
+
+      },1000);
+
+  },700);
 }
 
 function finishFaceRound(token){
-if(token!==roundToken)return;
 
-stopFaceScoring();
+  if(token !== roundToken) return;
 
-$("faceCountdown").textContent=
-"ROUND OVER!";
+  if(!roundActive) return;
 
-const score=Math.round(lastScore);
+  roundActive = false;
 
-if(ws?.readyState===1){
-ws.send(JSON.stringify({
-type:"round-score",
-score
-}));
-}
+  stopFaceScoring();
+
+  const score =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(lastScore)
+      )
+    );
+
+  $("faceCountdown").textContent =
+    "ROUND COMPLETE";
+
+  $("faceStatus").textContent =
+    `Your score: ${score}/100`;
+
+  if(ws?.readyState === 1){
+
+    ws.send(JSON.stringify({
+      type: "round-score",
+      score
+    }));
+
+    ws.send(JSON.stringify({
+      type: "next-round"
+    }));
+  }
 }
 
 async function loadObjectMatcher(){
-if(objectMatcher)return;
 
-if(objectMatcherLoading)return objectMatcherLoading;
+  if(objectMatcher) return objectMatcher;
 
-objectMatcherLoading=(async()=>{
-try{
-const {pipeline,env}=await import(
-"https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2"
-);
+  if(objectMatcherLoading)
+    return objectMatcherLoading;
 
-env.allowLocalModels=false;
-env.useBrowserCache=true;
+  objectMatcherLoading =
+    (async () => {
 
-objectMatcher=await pipeline(
-"zero-shot-image-classification",
-"Xenova/clip-vit-base-patch32",
-{device:"webgpu"}
-).catch(async()=>{
-return pipeline(
-"zero-shot-image-classification",
-"Xenova/clip-vit-base-patch32"
-);
-});
+      const {
+        pipeline,
+        env
+      } = await import(
+        "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2"
+      );
 
-}catch(err){
-console.error("Object AI failed",err);
+      env.allowLocalModels = false;
+      env.useBrowserCache = true;
 
-$("huntStatus").textContent=
-"Object AI could not load. Try refreshing.";
-}
+      try{
 
-})();
+        objectMatcher =
+          await pipeline(
+            "zero-shot-image-classification",
+            "Xenova/clip-vit-base-patch32",
+            {
+              device:"webgpu"
+            }
+          );
 
-return objectMatcherLoading;
+      }catch(e){
+
+        objectMatcher =
+          await pipeline(
+            "zero-shot-image-classification",
+            "Xenova/clip-vit-base-patch32"
+          );
+      }
+
+      return objectMatcher;
+
+    })();
+
+  return objectMatcherLoading;
 }
 
 function huntLabels(target){
-return [
-...target.aliases,
-`a different object`,
-`an empty scene`
-];
+
+  return [
+    target.label,
+    ...(target.aliases || []),
+    "different object",
+    "empty scene",
+    "person",
+    "background"
+  ];
 }
 
-async function checkHuntFrame(token){
-if(
-token!==roundToken ||
-!huntScanning ||
-huntFoundLocal
-){
-return;
-}
+async function checkHuntFrame(video, target, token){
 
-const video=$("localHunt");
+  if(
+    !objectMatcher ||
+    token !== roundToken ||
+    !huntScanning ||
+    huntFoundLocal
+  ){
+    return;
+  }
 
-if(
-!video ||
-video.readyState<2 ||
-!objectMatcher
-){
-return;
-}
+  try{
 
-try{
-const target=JSON.parse(
-$("huntTargetName").dataset.target || "{}"
-);
+    const labels =
+      huntLabels(target);
 
-const labels=huntLabels(target);
+    const results =
+      await objectMatcher(
+        video,
+        {
+          candidate_labels: labels
+        }
+      );
 
-const results=
-await objectMatcher(
-video,
-labels
-);
+    if(token !== roundToken || !huntScanning)
+      return;
 
-if(token!==roundToken)return;
+    const best =
+      results.find(
+        x =>
+          x.label.toLowerCase() ===
+          target.label.toLowerCase()
+      ) || results[0];
 
-const best=results[0];
+    const top =
+      results[0];
 
-const confidence=best?.score||0;
+    const confidence =
+      best?.score || 0;
 
-const differentScore=
-results.find(x=>
-x.label.includes("different object")
-)?.score||0;
+    const differentScore =
+      results.find(
+        x =>
+          x.label.includes(
+            "different object"
+          )
+      )?.score || 0;
 
-const emptyScore=
-results.find(x=>
-x.label.includes("empty scene")
-)?.score||0;
+    const emptyScore =
+      results.find(
+        x =>
+          x.label.includes(
+            "empty scene"
+          )
+      )?.score || 0;
 
-const top=results[0];
+    $("huntStatus").textContent =
+      `AI sees: ${top?.label || "nothing yet"} (${Math.round((top?.score || 0)*100)}%) — hold the ${target.label} clearly in view`;
 
-$("huntStatus").textContent=
-`AI sees: ${top?.label||"nothing yet"} (${Math.round((top?.score||0)*100)}%) — hold the ${target.label} clearly in view`;
+    const pct =
+      Math.max(
+        0,
+        Math.min(
+          100,
+          confidence * 100
+        )
+      );
 
-const pct=
-Math.max(
-0,
-Math.min(
-100,
-confidence*100
-)
-);
+    $("huntProgress").style.width =
+      pct + "%";
 
-$("huntProgress").style.width=
-pct+"%";
+    const strongEnough =
+      confidence >= .55 &&
+      confidence >= differentScore + .12 &&
+      confidence >= emptyScore + .15;
 
-const strongEnough=
-confidence>=.55 &&
-confidence>=differentScore+.12 &&
-confidence>=emptyScore+.15;
+    huntConfirmations =
+      strongEnough
+        ? huntConfirmations + 1
+        : 0;
 
-huntConfirmations=
-strongEnough
-?huntConfirmations+1
-:0;
+    if(huntConfirmations >= 3){
 
-if(huntConfirmations>=3){
-huntFoundLocal=true;
-huntScanning=false;
+      huntFoundLocal = true;
+      huntScanning = false;
 
-stopHuntTimer();
+      stopHuntTimer();
 
-$("huntCountdown").textContent=
-"ITEM FOUND!";
+      $("huntCountdown").textContent =
+        "ITEM FOUND!";
 
-$("huntResult").textContent=
-"📦 You found it first — checking with the server…";
+      $("huntResult").classList.remove("hidden");
 
-if(ws?.readyState===1){
-ws.send(JSON.stringify({
-type:"hunt-found",
-round:Number(
-$("huntRoundText").dataset.round
-)||1
-}));
-}
+      $("huntResult").textContent =
+        "📦 You found it first — checking with the server…";
 
-return;
-}
+      if(ws?.readyState === 1){
 
-}catch(err){
-console.warn("Hunt scan error",err);
-}
+        ws.send(JSON.stringify({
+          type:"hunt-found",
+          round:
+            Number(
+              $("huntRoundText")
+                .dataset.round
+            ) || 1
+        }));
+      }
+    }
 
-setTimeout(()=>{
-checkHuntFrame(token);
-},800);
+  }catch(e){
+
+    $("huntStatus").textContent =
+      "AI is checking your camera…";
+  }
 }
 
 function startHuntTimer(token){
-stopHuntTimer();
 
-huntTimeLeft=HUNT_SECONDS;
+  stopHuntTimer();
 
-$("huntCountdown").textContent=
-`GO FIND IT! — ${huntTimeLeft}s`;
+  huntTimeLeft =
+    HUNT_SECONDS;
 
-huntTimer=setInterval(()=>{
-if(token!==roundToken){
-stopHuntTimer();
-return;
-}
+  $("huntCountdown").textContent =
+    `GO FIND IT! — ${huntTimeLeft}s`;
 
-huntTimeLeft--;
+  huntTimer =
+    setInterval(() => {
 
-if(huntTimeLeft>0){
-$("huntCountdown").textContent=
-`GO FIND IT! — ${huntTimeLeft}s`;
-}else{
-stopHuntTimer();
-huntScanning=false;
+      if(token !== roundToken){
 
-$("huntCountdown").textContent=
-"TIME UP!";
+        stopHuntTimer();
+        return;
+      }
 
-if(ws?.readyState===1){
-ws.send(JSON.stringify({
-type:"hunt-timeout",
-round:Number(
-$("huntRoundText").dataset.round
-)||1
-}));
-}
-}
+      huntTimeLeft--;
 
-},1000);
+      if(huntTimeLeft > 0){
+
+        $("huntCountdown").textContent =
+          `GO FIND IT! — ${huntTimeLeft}s`;
+
+      }else{
+
+        stopHuntTimer();
+
+        huntScanning = false;
+
+        $("huntCountdown").textContent =
+          "TIME UP!";
+
+        if(ws?.readyState === 1){
+
+          ws.send(JSON.stringify({
+            type:"hunt-timeout",
+            round:
+              Number(
+                $("huntRoundText")
+                  .dataset.round
+              ) || 1
+          }));
+        }
+      }
+
+    },1000);
 }
 
 function stopHuntTimer(){
-if(huntTimer){
-clearInterval(huntTimer);
-huntTimer=null;
-}
+
+  if(huntTimer){
+
+    clearInterval(
+      huntTimer
+    );
+
+    huntTimer = null;
+  }
 }
 
-async function startHuntRound(round,target){
-roundToken++;
+async function startHuntRound(target, token){
 
-const token=roundToken;
+  stopHuntTimer();
 
-huntScanning=false;
-huntFoundLocal=false;
-huntConfirmations=0;
+  huntFoundLocal = false;
+  huntScanning = false;
+  huntConfirmations = 0;
 
-stopHuntTimer();
+  $("huntEmoji").textContent =
+    target.emoji;
 
-$("huntRoundText").textContent=
-`ROUND ${round} / ${TOTAL_HUNT}`;
+  $("huntTargetText").textContent =
+    target.label;
 
-$("huntRoundText").dataset.round=round;
+  $("huntProgress").style.width =
+    "0%";
 
-$("huntTargetEmoji").textContent=
-target?.emoji||"🔎";
+  $("huntResult").classList.add("hidden");
 
-$("huntTargetName").textContent=
-target?.label||"Find it!";
+  $("huntStatus").textContent =
+    "Loading object AI...";
 
-$("huntTargetName").dataset.target=
-JSON.stringify(target||{});
+  $("huntSkipStatus").textContent =
+    "";
 
-$("huntCountdown").textContent=
-`GO FIND IT! — ${HUNT_SECONDS}s`;
+  startHuntTimer(token);
 
-$("huntResult").textContent="";
+  try{
 
-$("huntProgress").style.width="0%";
+    await loadObjectMatcher();
 
-$("huntStatus").textContent=
-"Loading object AI…";
+    if(token !== roundToken) return;
 
-$("huntSkipItem").textContent=
-"⏭️ SKIP ITEM";
+    huntScanning = true;
 
-await loadObjectMatcher();
+    $("huntStatus").textContent =
+      `Find the ${target.label}!`;
 
-if(token!==roundToken)return;
+    const scan = async () => {
 
-huntScanning=true;
+      if(
+        token !== roundToken ||
+        !huntScanning ||
+        huntFoundLocal
+      ){
+        return;
+      }
 
-$("huntStatus").textContent=
-`Find the ${target?.label||"object"} and hold it clearly in view.`;
+      await checkHuntFrame(
+        $("localHuntVideo"),
+        target,
+        token
+      );
 
-startHuntTimer(token);
+      setTimeout(
+        scan,
+        800
+      );
+    };
 
-setTimeout(()=>{
-if(token===roundToken){
-checkHuntFrame(token);
-}
-},700);
-}
+    setTimeout(
+      scan,
+      700
+    );
 
-function setupPeer(peerRole){
-return new Promise(async resolve=>{
-if(pc){
-try{
-pc.close();
-}catch{}
-}
+  }catch(e){
 
-pc=new RTCPeerConnection({
-iceServers:[
-{
-urls:"stun:stun.l.google.com:19302"
-}
-]
-});
-
-if(stream){
-for(const track of stream.getTracks()){
-pc.addTrack(track,stream);
+    $("huntStatus").textContent =
+      "Object AI could not load. Try refreshing the page.";
+  }
 }
-}
 
-pc.ontrack=e=>{
-const stream=e.streams?.[0];
+function setupPeer(){
 
-if(!stream)return;
+  if(pc){
+    pc.close();
+  }
 
-for(const id of [
-"remoteWaiting",
-"remoteFace",
-"remoteChat",
-"remoteHunt"
-]){
-const video=$(id);
+  pc =
+    new RTCPeerConnection({
+      iceServers:[
+        {
+          urls:
+            "stun:stun.l.google.com:19302"
+        }
+      ]
+    });
 
-if(video){
-video.srcObject=stream;
-}
-}
-};
-
-pc.onicecandidate=e=>{
-if(
-e.candidate &&
-ws?.readyState===1
-){
-ws.send(JSON.stringify({
-type:"signal",
-signal:{
-candidate:e.candidate
-}
-}));
-}
-};
+  if(stream){
 
-if(peerRole==="a"){
-const offer=await pc.createOffer();
+    stream.getTracks().forEach(
+      track =>
+        pc.addTrack(
+          track,
+          stream
+        )
+    );
+  }
 
-await pc.setLocalDescription(offer);
+  pc.ontrack = event => {
 
-ws.send(JSON.stringify({
-type:"signal",
-signal:{
-description:pc.localDescription
-}
-}));
-}
+    const video =
+      currentMode === "face"
+        ? $("remoteFaceVideo")
+        : currentMode === "hunt"
+          ? $("remoteHuntVideo")
+          : $("remoteChatVideo");
+
+    if(video){
+
+      if(video.srcObject !== event.streams[0]){
+        video.srcObject =
+          event.streams[0];
+      }
+    }
+  };
 
-resolve();
-});
+  pc.onicecandidate = event => {
+
+    if(
+      event.candidate &&
+      ws?.readyState === 1
+    ){
+
+      ws.send(JSON.stringify({
+        type:"signal",
+        signal:{
+          candidate:
+            event.candidate
+        }
+      }));
+    }
+  };
 }
 
-async function handleSignal(m){
-if(!pc)return;
+async function handleSignal(signal){
 
-try{
-if(m.signal?.description){
-const desc=m.signal.description;
+  if(!pc) setupPeer();
 
-if(desc.type==="offer"){
-await pc.setRemoteDescription(desc);
+  if(signal.candidate){
 
-const answer=await pc.createAnswer();
+    try{
 
-await pc.setLocalDescription(answer);
+      await pc.addIceCandidate(
+        signal.candidate
+      );
 
-ws.send(JSON.stringify({
-type:"signal",
-signal:{
-description:pc.localDescription
-}
-}));
-}
+    }catch(e){}
 
-else if(desc.type==="answer"){
-await pc.setRemoteDescription(desc);
-}
-}
+    return;
+  }
 
-if(m.signal?.candidate){
-await pc.addIceCandidate(
-m.signal.candidate
-);
-}
+  if(signal.sdp){
 
-}catch(err){
-console.warn("WebRTC signal error",err);
-}
-}
+    await pc.setRemoteDescription(
+      signal.sdp
+    );
 
-function closeConnection(){
-if(ws){
-try{
-ws.close();
-}catch{}
+    if(signal.sdp.type === "offer"){
 
-ws=null;
-}
+      const answer =
+        await pc.createAnswer();
 
-if(pc){
-try{
-pc.close();
-}catch{}
+      await pc.setLocalDescription(
+        answer
+      );
 
-pc=null;
+      ws.send(JSON.stringify({
+        type:"signal",
+        signal:{
+          sdp:
+            pc.localDescription
+        }
+      }));
+    }
+  }
 }
-}
 
-function connectLobby(){
-if(ws?.readyState===1)return;
+async function connectLobby(){
 
-try{
-ws=new WebSocket(wsUrl());
+  if(ws?.readyState === 1)
+    return;
 
-ws.onopen=()=>{
-$("connection").textContent=
-"Connected";
-};
+  return new Promise(
+    (resolve,reject) => {
 
-ws.onmessage=e=>{
-let m;
+      connecting = true;
 
-try{
-m=JSON.parse(e.data);
-}catch{
-return;
-}
+      ws =
+        new WebSocket(
+          wsUrl()
+        );
 
-if(m.type==="ready"){
-ws.__playerId=m.playerId;
+      ws.onopen = () => {
 
-ws.send(JSON.stringify({
-type:"set-username",
-username
-}));
+        connecting = false;
 
-requestLeaderboards();
-}
+        ws.send(JSON.stringify({
+          type:"set-username",
+          username
+        }));
 
-if(m.type==="online-list"){
-renderOnline(m);
-}
+        requestFriends();
+        requestLeaderboards();
 
-if(m.type==="username-saved"){
-setUsername(m.username);
-}
+        resolve();
+      };
 
-if(m.mode&&m.rows){
-renderLeaderboard(
-m.mode,
-m.rows
-);
-}
-};
-
-ws.onclose=()=>{
-$("connection").textContent=
-"Not connected";
-};
-
-}catch(err){
-console.warn(err);
-}
-}
+      ws.onerror = () => {
 
-async function connectToServer(){
-return new Promise((resolve,reject)=>{
-if(connecting){
-return;
-}
+        connecting = false;
 
-connecting=true;
-
-try{
-ws=new WebSocket(wsUrl());
-}catch(err){
-connecting=false;
-reject(err);
-return;
-}
+        reject(
+          new Error(
+            "Could not connect to EmojiTV."
+          )
+        );
+      };
 
-let settled=false;
+      ws.onclose = () => {
 
-function finish(ok,error){
-if(settled)return;
+        connecting = false;
 
-settled=true;
-connecting=false;
+        ws = null;
+      };
 
-if(ok){
-resolve();
-}else{
-reject(error||new Error("server"));
-}
-}
+      ws.onmessage = async event => {
 
-ws.onopen=()=>{
-ws.send(JSON.stringify({
-type:"find-match",
-mode:currentMode,
-username
-}));
-
-finish(true);
-};
-
-ws.onerror=()=>{
-finish(false,new Error("server"));
-};
-
-ws.onclose=()=>{
-$("connection").textContent=
-"Not connected";
-
-if(!settled){
-finish(false,new Error("server"));
-}
-};
-
-ws.onmessage=async e=>{
-let m;
-
-try{
-m=JSON.parse(e.data);
-}catch{
-return;
-}
+        let message;
 
-if(m.type==="waiting"){
-$("matchStatus").textContent=
-"Camera is live ✓ Waiting for another player…";
-}
+        try{
 
-if(m.type==="matched"){
-rematchSent=false;
+          message =
+            JSON.parse(
+              event.data
+            );
 
-role=m.role;
+        }catch{
 
-opponentUsername=
-m.opponentUsername||"PLAYER";
+          return;
+        }
 
-updateOpponentLabels();
+        if(message.type === "online-list"){
 
-await setupPeer(role);
+          renderOnline(message);
+          return;
+        }
 
-setLocalVideos();
+        if(message.type === "friends"){
 
-$("matchStatus").textContent=
-`${opponentUsername} found!`;
+          renderFriends(message);
+          return;
+        }
 
-show(
-m.mode==="face"
-?"faceGame"
-:m.mode==="chat"
-?"chatGame"
-:"huntGame"
-);
+        if(message.type === "friend-request-received"){
 
-if(m.mode==="face"){
-loadFaceScoring();
-runFaceRound(
-m.round,
-m.target||"😎"
-);
-}
+          $("friendNotice").innerHTML =
+            `<div class="success">
+              👥 ${escapeHtml(message.from)} sent you a friend request.
+            </div>`;
 
-else if(m.mode==="hunt"){
-loadObjectMatcher();
-startHuntRound(
-m.round,
-m.target
-);
-}
+          requestFriends();
+          return;
+        }
 
-else{
-$("messages").innerHTML="";
-}
-}
+        if(message.type === "friend-result"){
 
-if(m.type==="signal"){
-handleSignal(m);
-}
+          $("friendSearchResult").textContent =
+            message.ok
+              ? message.message
+              : message.error;
 
-if(m.type==="opponent-score"){
-$("faceOpponentScore").textContent=
-m.score;
+          $("friendNotice").innerHTML =
+            message.ok
+              ? `<div class="success">${escapeHtml(message.message || "Done.")}</div>`
+              : `<div class="error">${escapeHtml(message.error || "Something went wrong.")}</div>`;
 
-showFaceResultIfReady();
-}
+          requestFriends();
+          return;
+        }
 
-if(m.type==="your-score"){
-$("faceYourScore").textContent=
-m.score;
+        if(message.type === "invite-result"){
 
-lastScore=m.score;
+          if(!message.ok){
+            alert(message.error || "Invite failed.");
+          }else{
+            alert(message.message || "Invite sent.");
+          }
 
-showFaceResultIfReady();
-}
+          return;
+        }
 
-if(m.type==="new-round"){
-if(m.mode==="face"){
-runFaceRound(
-m.round,
-m.target
-);
-}
+        if(message.type === "game-invite"){
 
-else if(m.mode==="hunt"){
-startHuntRound(
-m.round,
-m.target
-);
-}
-}
+          showGameInvite(message);
+          return;
+        }
 
-if(m.type==="game-over"){
-stopFaceScoring();
-huntScanning=false;
-stopHuntTimer();
+        if(message.type === "invite-declined"){
 
-$("faceCountdown").textContent=
-"GAME OVER!";
+          alert(
+            `${message.from} declined your invite.`
+          );
 
-$("faceResult").textContent=
-"GAME OVER!";
+          return;
+        }
 
-$("huntCountdown").textContent=
-"GAME OVER!";
+        if(message.type === "dm-history"){
 
-$("huntResult").textContent=
-"GAME OVER!";
+          renderDmHistory(
+            message.messages || []
+          );
 
-$("facePlayAgain").style.display=
-currentMode==="face"
-?"inline-block"
-:"none";
+          return;
+        }
 
-$("huntPlayAgain").style.display=
-currentMode==="hunt"
-?"inline-block"
-:"none";
-}
+        if(message.type === "dm"){
 
-if(m.type==="hunt-winner"){
-huntScanning=false;
-stopHuntTimer();
-
-const mine=
-m.winnerId===ws.__playerId;
-
-$("huntYourScore").textContent=
-Object.entries(
-m.scores||{}
-).find(
-([id])=>id===ws.__playerId
-)?.[1]
-??
-$("huntYourScore").textContent;
-
-$("huntOpponentScore").textContent=
-Object.entries(
-m.scores||{}
-).find(
-([id])=>id!==ws.__playerId
-)?.[1]
-??
-$("huntOpponentScore").textContent;
-
-$("huntCountdown").textContent=
-mine
-?"🏆 YOU FOUND IT FIRST!"
-:`😮 ${opponentUsername||"PLAYER"} FOUND IT FIRST!`;
-
-$("huntResult").textContent=
-mine
-?"+1 POINT!"
-:"No point this round.";
-}
+          if(
+            dmWith === message.from ||
+            message.from === username
+          ){
 
-if(m.type==="rematch-status"){
-$("facePlayAgain").textContent=
-m.ready===1
-?"✓ WAITING FOR THEM…"
-:"🔁 PLAY AGAIN WITH THEM";
-
-$("huntPlayAgain").textContent=
-m.ready===1
-?"✓ WAITING FOR THEM…"
-:"🔁 PLAY AGAIN WITH THEM";
-
-$("chatPlayAgain").textContent=
-m.ready===1
-?"✓ WAITING FOR THEM…"
-:"🔁 PLAY AGAIN WITH THEM";
-}
+            appendDm(message);
+          }
 
-if(m.type==="rematch-started"){
-rematchSent=false;
+          return;
+        }
 
-$("faceYourScore").textContent="0";
-$("faceOpponentScore").textContent="0";
+        if(message.type === "face"){
 
-$("huntYourScore").textContent="0";
-$("huntOpponentScore").textContent="0";
+          return;
+        }
 
-if(m.mode==="face"){
-show("faceGame");
+        if(message.mode && message.rows){
 
-runFaceRound(
-m.round,
-m.target
-);
-}
+          renderLeaderboard(
+            message.mode,
+            message.rows
+          );
 
-else if(m.mode==="hunt"){
-show("huntGame");
+          return;
+        }
 
-startHuntRound(
-m.round,
-m.target
-);
-}
+        if(message.type === "report-result"){
 
-else{
-$("messages").innerHTML="";
-show("chatGame");
-}
-}
+          if(message.ok){
 
-if(m.type==="skip-item-status"){
-$("huntSkipItem").textContent=
-m.ready===1
-?"✓ WAITING FOR THEM…"
-:"⏭️ SKIP ITEM";
-}
+            $("reportStatus").innerHTML =
+              `<div class="success">
+                Report submitted.
+              </div>`;
 
-if(
-m.type==="skip-item-result" &&
-!m.ok
-){
-alert(
-m.error||
-"Unable to skip this item."
-);
-}
+            setTimeout(
+              closeReport,
+              1200
+            );
 
-if(m.type==="hunt-timeout"){
-huntScanning=false;
-stopHuntTimer();
+          }else{
 
-$("huntCountdown").textContent=
-"TIME UP!";
+            $("reportStatus").innerHTML =
+              `<div class="error">
+                ${escapeHtml(message.error || "Report failed.")}
+              </div>`;
+          }
 
-$("huntResult").textContent=
-"No point this round.";
-}
+          return;
+        }
 
-if(m.type==="friend-request-received"){
-if(
-$("friendsModal").classList.contains("show")
-){
-requestFriends();
-}else{
-alert(
-`${m.from} sent you a friend request. Open FRIENDS to accept it.`
-);
-}
-}
+        if(message.type === "waiting"){
 
-if(m.type==="game-invite"){
-showGameInvite(m);
-}
+          currentMode =
+            message.mode;
 
-if(m.type==="invite-result"){
-$("friendNotice").textContent=
-m.message||m.error||"";
-}
+          show("match");
 
-if(m.type==="invite-declined"){
-$("friendNotice").textContent=
-`${m.from} declined the game invite.`;
-}
+          $("waitingTitle").textContent =
+            message.mode === "hunt"
+              ? "Finding an Emoji Hunt player..."
+              : message.mode === "chat"
+                ? "Finding a video chat player..."
+                : "Finding a Face-Off player...";
 
-if(m.type==="friend-result"){
-$("friendNotice").textContent=
-m.message||m.error||"";
+          return;
+        }
 
-requestFriends();
-}
+        if(message.type === "matched"){
 
-if(m.type==="friends"){
-renderFriends(m);
-}
+          currentMode =
+            message.mode;
 
-if(
-m.type==="dm-history" &&
-m.with===dmWith
-){
-renderDmHistory(m.messages);
-}
+          role =
+            message.role;
 
-if(
-m.type==="dm" &&
-m.from===dmWith
-){
-appendDm(m);
-}
+          opponentUsername =
+            message.opponentUsername ||
+            "Opponent";
 
-if(m.type==="chat-message"){
-const div=
-document.createElement("div");
+          roundToken++;
 
-div.className=
-"msg"+(m.self?" self":"");
+          show(
+            message.mode === "face"
+              ? "faceGame"
+              : message.mode === "hunt"
+                ? "huntGame"
+                : "chatGame"
+          );
 
-div.textContent=
-(m.self?"You: ":"Them: ")+
-m.text;
+          updateOpponentLabels();
 
-$("messages").appendChild(div);
+          try{
 
-$("messages").scrollTop=
-$("messages").scrollHeight;
-}
+            if(!stream){
 
-if(m.type==="report-result"){
-if(m.ok){
-$("reportSuccess").textContent=
-`Report submitted ✓ Reference: ${m.reportId.slice(0,8)}`;
+              await getCameraAndMic();
 
-$("reportSuccess").classList.add("show");
+            }
 
-setTimeout(
-closeReport,
-1400
-);
+            setLocalVideos();
 
-}else{
-$("reportSuccess").textContent=
-m.error||
-"Could not submit report.";
+          }catch(e){
 
-$("reportSuccess").classList.add("show");
-}
-}
+            setError(
+              "Camera and microphone access is required to play."
+            );
 
-if(m.type==="opponent-left"){
-const mode=currentMode;
+            return;
+          }
 
-closeConnection();
+          setupPeer();
 
-$("matchStatus").textContent=
-"Player left. Finding someone new…";
+          if(role === "a"){
 
-show("match");
+            const offer =
+              await pc.createOffer();
 
-connectToServer().catch(()=>{});
-}
-};
-});
+            await pc.setLocalDescription(
+              offer
+            );
+
+            ws.send(JSON.stringify({
+              type:"signal",
+              signal:{
+                sdp:
+                  pc.localDescription
+              }
+            }));
+          }
+
+          if(message.mode === "face"){
+
+            $("faceRoundText").textContent =
+              `Round ${message.round} / ${message.totalRounds}`;
+
+            $("faceEmoji").textContent =
+              message.target;
+
+            $("faceYourScore").textContent =
+              "0";
+
+            $("faceOpponentScore").textContent =
+              "0";
+
+            runFaceRound(
+              roundToken
+            );
+          }
+
+          if(message.mode === "hunt"){
+
+            $("huntRoundText").dataset.round =
+              message.round;
+
+            $("huntRoundText").textContent =
+              `Round ${message.round} / ${message.totalRounds}`;
+
+            startHuntRound(
+              message.target,
+              roundToken
+            );
+          }
+
+          if(message.mode === "chat"){
+
+            $("chatMessages").innerHTML = "";
+          }
+
+          return;
+        }
+
+        if(message.type === "signal"){
+
+          try{
+
+            await handleSignal(
+              message.signal
+            );
+
+          }catch(e){}
+
+          return;
+        }
+
+        if(message.type === "new-round"){
+
+          roundToken++;
+
+          const token =
+            roundToken;
+
+          if(message.mode === "face"){
+
+            $("faceRoundText").textContent =
+              `Round ${message.round} / ${message.totalRounds}`;
+
+            $("faceEmoji").textContent =
+              message.target;
+
+            $("faceCountdown").textContent =
+              "GET READY!";
+
+            $("faceStatus").textContent =
+              "Get ready...";
+
+            runFaceRound(token);
+          }
+
+          if(message.mode === "hunt"){
+
+            $("huntRoundText").dataset.round =
+              message.round;
+
+            $("huntRoundText").textContent =
+              `Round ${message.round} / ${message.totalRounds}`;
+
+            startHuntRound(
+              message.target,
+              token
+            );
+
+            if(message.skipped){
+
+              $("huntSkipStatus").textContent =
+                "⏭️ Item skipped — new item selected.";
+            }
+          }
+
+          return;
+        }
+
+        if(message.type === "your-score"){
+
+          $("faceYourScore").textContent =
+            message.totalScore;
+
+          return;
+        }
+
+        if(message.type === "opponent-score"){
+
+          $("faceOpponentScore").textContent =
+            message.totalScore;
+
+          return;
+        }
+
+        if(message.type === "skip-item-status"){
+
+          if(message.ready >= 2){
+
+            $("huntSkipStatus").textContent =
+              "Changing item...";
+
+          }else{
+
+            $("huntSkipStatus").textContent =
+              "✓ Waiting for them to press Skip Item...";
+          }
+
+          return;
+        }
+
+        if(message.type === "hunt-winner"){
+
+          stopHuntTimer();
+
+          huntScanning = false;
+
+          const winner =
+            message.winnerId ===
+            message.winnerId &&
+            message.winnerId ===
+            message.winnerId;
+
+          const youWon =
+            message.winnerId ===
+            message.winnerId &&
+            false;
+
+          $("huntYourScore").textContent =
+            message.scores?.[message.winnerId] ??
+            $("huntYourScore").textContent;
+
+          const text =
+            message.winnerId ===
+            message.winnerId
+              ? "📦 Item found!"
+              : "📦 Item found!";
+
+          $("huntResult").classList.remove("hidden");
+          $("huntResult").textContent =
+            text;
+
+          return;
+        }
+
+        if(message.type === "hunt-timeout"){
+
+          stopHuntTimer();
+
+          huntScanning = false;
+
+          $("huntCountdown").textContent =
+            "TIME UP!";
+
+          $("huntResult").classList.remove("hidden");
+
+          $("huntResult").textContent =
+            "⏰ Time's up! No point this round.";
+
+          return;
+        }
+
+        if(message.type === "game-over"){
+
+          roundActive = false;
+
+          stopFaceScoring();
+          stopHuntTimer();
+
+          huntScanning = false;
+
+          const scores =
+            message.finalScores || {};
+
+          let myScore = 0;
+          let theirScore = 0;
+
+          if(role === "a"){
+
+            myScore =
+              scores[Object.keys(scores)[0]] || 0;
+
+            theirScore =
+              scores[Object.keys(scores)[1]] || 0;
+
+          }
+
+          if(message.mode === "face"){
+
+            $("faceCountdown").textContent =
+              "GAME OVER!";
+
+            $("faceStatus").textContent =
+              "🏆 Match complete!";
+
+          }
+
+          if(message.mode === "hunt"){
+
+            $("huntCountdown").textContent =
+              "GAME OVER!";
+
+            $("huntResult").classList.remove("hidden");
+
+            $("huntResult").innerHTML =
+              `<div class="resultBig">🏆 GAME OVER!</div>
+               <p>Final Hunt scores are shown above.</p>
+               <div class="controls">
+                 <button class="primary" id="huntPlayAgain">🔁 PLAY AGAIN WITH THEM</button>
+                 <button class="secondary" id="huntBackHome">HOME</button>
+               </div>`;
+
+            $("huntPlayAgain").onclick =
+              () => sendRematch();
+
+            $("huntBackHome").onclick =
+              () => leaveToHome();
+          }
+
+          return;
+        }
+
+        if(message.type === "rematch-status"){
+
+          if(currentMode === "hunt"){
+
+            $("huntResult").classList.remove("hidden");
+
+            $("huntResult").textContent =
+              message.ready >= 2
+                ? "Starting rematch..."
+                : "✓ Waiting for them to play again...";
+          }
+
+          return;
+        }
+
+        if(message.type === "rematch-started"){
+
+          roundToken++;
+
+          currentMode =
+            message.mode;
+
+          if(message.mode === "hunt"){
+
+            $("huntRoundText").dataset.round =
+              "1";
+
+            $("huntRoundText").textContent =
+              "Round 1 / 10";
+
+            startHuntRound(
+              message.target,
+              roundToken
+            );
+          }
+
+          if(message.mode === "face"){
+
+            $("faceRoundText").textContent =
+              "Round 1 / 5";
+
+            runFaceRound(
+              roundToken
+            );
+          }
+
+          return;
+        }
+
+        if(message.type === "opponent-left"){
+
+          stopHuntTimer();
+          stopFaceScoring();
+
+          huntScanning = false;
+          roundActive = false;
+
+          alert(
+            "The other player left the game."
+          );
+
+          leaveToHome();
+
+          return;
+        }
+
+        if(message.type === "chat-message"){
+
+          const div =
+            document.createElement("div");
+
+          div.className =
+            "message " +
+            (message.self ? "self" : "");
+
+          div.textContent =
+            message.text;
+
+          $("chatMessages")
+            .appendChild(div);
+
+          $("chatMessages").scrollTop =
+            $("chatMessages").scrollHeight;
+
+          return;
+        }
+
+      };
+
+    }
+  );
 }
 
 function updateOpponentLabels(){
-const name=
-opponentUsername||"OPPONENT";
 
-$("waitingOpponentLabel").textContent=name;
-$("faceOpponentLabel").textContent=name;
-$("faceOpponentName").textContent=name;
-$("chatOpponentLabel").textContent=name;
-$("huntOpponentLabel").textContent=name;
-$("huntOpponentName").textContent=name;
-}
+  const name =
+    opponentUsername ||
+    "Opponent";
 
-function showFaceResultIfReady(){
-if(
-$("faceCountdown").textContent!=="ROUND OVER!"
-){
-return;
-}
+  $("faceOpponentName").textContent =
+    name;
 
-const a=
-Number($("faceYourScore").textContent);
+  $("chatOpponentName").textContent =
+    name;
 
-const b=
-Number($("faceOpponentScore").textContent);
+  $("chatOpponentVideoName").textContent =
+    name;
 
-$("faceResult").textContent=
-a>b
-?"🏆 YOU WIN THIS ROUND!"
-:a<b
-?`😮 ${opponentUsername||"PLAYER"} WINS THIS ROUND!`
-:"🤝 TIE!";
-
-setTimeout(()=>{
-if(ws?.readyState===1){
-ws.send(JSON.stringify({
-type:"next-round"
-}));
-}
-},1200);
+  $("huntOpponentName").textContent =
+    name;
 }
 
 async function startMode(mode){
-closeConnection();
 
-currentMode=mode;
+  clearError();
 
-show("match");
+  try{
 
-$("matchTitle").textContent=
-mode==="face"
-?"Finding an Emoji Face-Off opponent…"
-:mode==="hunt"
-?"Finding an Emoji Hunt opponent…"
-:"Finding a video chat partner…";
+    await connectLobby();
 
-$("connection").textContent=
-"Camera starting…";
+  }catch(e){
 
-$("matchStatus").textContent=
-"Requesting camera and microphone…";
+    setError(
+      e.message ||
+      "Could not connect."
+    );
 
-clearError();
+    return;
+  }
 
-try{
-await getCameraAndMic();
+  currentMode = mode;
 
-setLocalVideos();
+  try{
 
-$("connection").textContent=
-"Camera connected";
+    if(!stream){
 
-await connectToServer();
+      await getCameraAndMic();
 
-}catch(err){
-$("connection").textContent=
-"Not connected";
+    }
 
-if(err?.name==="NotAllowedError"){
-setError(
-"Camera/microphone access was blocked. Allow both in your browser, then press RETRY."
-);
+    setLocalVideos();
+
+  }catch(e){
+
+    setError(
+      "Please allow camera and microphone access in your browser."
+    );
+
+    return;
+  }
+
+  if(ws?.readyState === 1){
+
+    ws.send(JSON.stringify({
+      type:"find-match",
+      mode,
+      username
+    }));
+  }
 }
 
-else if(err?.name==="NotFoundError"){
-setError(
-"No camera or microphone was found. Check your Logitech webcam and Fifine mic."
-);
-}
+function sendRematch(){
 
-else if(err?.message==="secure"){
-setError(
-"Use the published https://emojitv.onrender.com site."
-);
-}
+  if(
+    ws?.readyState === 1 &&
+    !rematchSent
+  ){
 
-else{
-setError(
-"The game server could not be reached. Press RETRY."
-);
-}
-}
+    rematchSent = true;
+
+    ws.send(JSON.stringify({
+      type:"rematch-ready"
+    }));
+  }
 }
 
 function leaveToHome(){
-roundToken++;
 
-stopFaceScoring();
+  stopHuntTimer();
+  stopFaceScoring();
 
-huntScanning=false;
+  huntScanning = false;
+  roundActive = false;
 
-stopHuntTimer();
+  if(ws?.readyState === 1){
 
-closeConnection();
+    ws.send(JSON.stringify({
+      type:"leave"
+    }));
+  }
 
-stopCamera();
+  if(pc){
 
-currentMode=null;
+    pc.close();
+    pc = null;
+  }
 
-$("connection").textContent=
-"Not connected";
+  stopCamera();
 
-show("home");
+  currentMode = null;
+  opponentUsername = "";
+  rematchSent = false;
 
-setTimeout(
-connectLobby,
-100
-);
+  show("home");
 }
 
 function skip(){
-roundToken++;
 
-stopFaceScoring();
+  stopHuntTimer();
+  stopFaceScoring();
 
-huntScanning=false;
+  huntScanning = false;
+  roundActive = false;
 
-stopHuntTimer();
+  if(ws?.readyState === 1){
 
-if(ws?.readyState===1){
-ws.send(JSON.stringify({
-type:"skip"
-}));
-}
+    ws.send(JSON.stringify({
+      type:"skip"
+    }));
+  }
 
-if(pc){
-try{
-pc.close();
-}catch{}
+  if(pc){
 
-pc=null;
-}
+    pc.close();
+    pc = null;
+  }
 
-$("remoteFace").srcObject=null;
-$("remoteChat").srcObject=null;
-$("remoteHunt").srcObject=null;
-$("remoteWaiting").srcObject=null;
+  stopCamera();
 
-$("matchStatus").textContent=
-"Finding someone new…";
-
-$("connection").textContent=
-"Searching…";
-
-show("match");
+  rematchSent = false;
 }
 
 function sendChat(){
-const input=$("chatInput");
-const text=input.value.trim();
 
-if(
-text &&
-ws?.readyState===1
-){
-ws.send(JSON.stringify({
-type:"chat-message",
-text
-}));
+  const text =
+    $("chatInput").value.trim();
 
-input.value="";
-}
-}
+  if(
+    !text ||
+    ws?.readyState !== 1
+  ){
+    return;
+  }
 
-function show(screen){
-document
-.querySelectorAll(".screen")
-.forEach(s=>s.classList.remove("active"));
+  ws.send(JSON.stringify({
+    type:"chat-message",
+    text
+  }));
 
-$(screen).classList.add("active");
-}
-
-function clearError(){
-$("error").textContent="";
-$("error").classList.remove("show");
-}
-
-function setError(text){
-$("error").textContent=text;
-$("error").classList.add("show");
-}
-
-function saveNameAndContinue(){
-const value=
-$("usernameInput").value.trim();
-
-if(!value){
-return;
-}
-
-setUsername(value);
-
-hideNameGate();
-
-if(ws?.readyState===1){
-ws.send(JSON.stringify({
-type:"set-username",
-username
-}));
-}
-
-requestFriends();
-requestLeaderboards();
+  $("chatInput").value = "";
 }
 
 async function shareEmojiTV(){
-const data={
-title:"EmojiTV",
-text:"Play EmojiTV with me!",
-url:location.href
-};
 
-try{
-if(
-navigator.share &&
-(!navigator.canShare ||
-navigator.canShare(data))
-){
-await navigator.share(data);
-return;
+  const data = {
+    title:"EmojiTV",
+    text:"Play EmojiTV with me!",
+    url:location.href
+  };
+
+  try{
+
+    if(
+      navigator.share &&
+      (
+        !navigator.canShare ||
+        navigator.canShare(data)
+      )
+    ){
+
+      await navigator.share(data);
+      return;
+    }
+
+    if(navigator.clipboard){
+
+      await navigator.clipboard.writeText(
+        location.href
+      );
+
+      alert(
+        "EmojiTV link copied! You can paste it into a message."
+      );
+
+      return;
+    }
+
+    alert(
+      "Copy this link and send it to your contact: " +
+      location.href
+    );
+
+  }catch(e){
+
+    if(e?.name !== "AbortError"){
+      console.warn(
+        "Share failed",
+        e
+      );
+    }
+  }
 }
 
-if(navigator.clipboard){
-await navigator.clipboard.writeText(
-location.href
+$("dashboardShare").onclick =
+  shareEmojiTV;
+
+$("friendSearchButton").onclick =
+  () =>
+    sendFriendRequestTo(
+      $("friendSearchInput").value,
+      $("friendSearchResult")
+    );
+
+$("friendSearchInput")
+  .addEventListener(
+    "keydown",
+    e => {
+
+      if(e.key === "Enter"){
+
+        sendFriendRequestTo(
+          $("friendSearchInput").value,
+          $("friendSearchResult")
+        );
+      }
+
+    }
+  );
+
+$("faceFriend").onclick =
+  addCurrentOpponentAsFriend;
+
+$("chatFriend").onclick =
+  addCurrentOpponentAsFriend;
+
+$("huntFriend").onclick =
+  addCurrentOpponentAsFriend;
+
+$("friendsButton").onclick =
+  openFriends;
+
+$("closeFriends").onclick =
+  closeFriends;
+
+$("closeDm").onclick =
+  () =>
+    $("dmPanel").classList.add("hidden");
+
+$("dmSend").onclick =
+  sendDm;
+
+$("dmInput")
+  .addEventListener(
+    "keydown",
+    e => {
+
+      if(e.key === "Enter"){
+        sendDm();
+      }
+
+    }
+  );
+
+$("leaderboardButton").onclick =
+  () => {
+
+    $("leaderboardPanel")
+      .classList.remove("hidden");
+
+    requestLeaderboards();
+  };
+
+$("closeLeaderboard").onclick =
+  () =>
+    $("leaderboardPanel")
+      .classList.add("hidden");
+
+$("closeReport").onclick =
+  closeReport;
+
+$("submitReport").onclick =
+  submitReport;
+
+$("faceReport").onclick =
+  () => openReport("face");
+
+$("chatReport").onclick =
+  () => openReport("chat");
+
+$("huntReport").onclick =
+  () => openReport("hunt");
+
+$("faceSkip").onclick =
+  skip;
+
+$("chatSkip").onclick =
+  skip;
+
+$("huntSkip").onclick =
+  skip;
+
+$("faceQuit").onclick =
+  leaveToHome;
+
+$("chatQuit").onclick =
+  leaveToHome;
+
+$("huntQuit").onclick =
+  leaveToHome;
+
+$("waitingCancel").onclick =
+  leaveToHome;
+
+$("faceStart").onclick =
+  () =>
+    startMode("face");
+
+$("chatStart").onclick =
+  () =>
+    startMode("chat");
+
+$("huntStart").onclick =
+  () =>
+    startMode("hunt");
+
+$("changeNameButton").onclick =
+  showNameGate;
+
+$("saveName").onclick =
+  async () => {
+
+    const value =
+      $("usernameInput").value.trim();
+
+    if(!value){
+
+      $("nameError").innerHTML =
+        `<div class="error">Enter a username.</div>`;
+
+      return;
+    }
+
+    setUsername(value);
+    hideNameGate();
+
+    if(ws?.readyState === 1){
+
+      ws.send(JSON.stringify({
+        type:"set-username",
+        username
+      }));
+
+    }else{
+
+      try{
+        await connectLobby();
+      }catch(e){}
+    }
+  };
+
+$("huntSkipItem").onclick =
+  () => {
+
+    if(
+      currentMode !== "hunt" ||
+      ws?.readyState !== 1
+    ){
+      return;
+    }
+
+    ws.send(JSON.stringify({
+      type:"skip-item"
+    }));
+
+    $("huntSkipStatus").textContent =
+      "✓ Waiting for them to press Skip Item...";
+  };
+
+$("chatSend").onclick =
+  sendChat;
+
+$("chatInput")
+  .addEventListener(
+    "keydown",
+    e => {
+
+      if(e.key === "Enter"){
+        sendChat();
+      }
+
+    }
+  );
+
+$("acceptInvite").onclick =
+  acceptGameInvite;
+
+$("declineInvite").onclick =
+  declineGameInvite;
+
+setUsername(
+  username || "Guest"
 );
 
-alert(
-"EmojiTV link copied! You can paste it into a message."
-);
-
-return;
-}
-
-alert(
-"Copy this link and send it to your contact: "+
-location.href
-);
-
-}catch(e){
-if(e?.name!=="AbortError"){
-console.warn(
-"Share failed",
-e
-);
-}
-}
-}
-
-if(username){
-setUsername(username);
-hideNameGate();
-}else{
-showNameGate();
-}
-
-connectLobby();
-
-$("dashboardShare").onclick=
-shareEmojiTV;
-
-$("friendSearchButton").onclick=()=>
-sendFriendRequestTo(
-$("friendSearchInput").value,
-$("friendSearchResult")
-);
-
-$("friendSearchInput").addEventListener(
-"keydown",
-e=>{
-if(e.key==="Enter"){
-sendFriendRequestTo(
-$("friendSearchInput").value,
-$("friendSearchResult")
-);
-}
-}
-);
-
-$("faceFriend").onclick=
-addCurrentOpponentAsFriend;
-
-$("chatFriend").onclick=
-addCurrentOpponentAsFriend;
-
-$("huntFriend").onclick=
-addCurrentOpponentAsFriend;
-
-$("saveUsername").onclick=
-saveNameAndContinue;
-
-$("usernameInput").addEventListener(
-"keydown",
-e=>{
-if(e.key==="Enter"){
-saveNameAndContinue();
-}
-}
-);
-
-$("changeUsername").onclick=()=>{
-showNameGate();
-$("usernameInput").select();
-};
-
-$("leaderboardToggle").onclick=()=>{
-$("leaderPanel").classList.toggle("show");
-requestLeaderboards();
-};
-
-document
-.querySelectorAll("[data-mode]")
-.forEach(b=>{
-b.onclick=()=>{
 if(!username){
-showNameGate();
-return;
+
+  showNameGate();
+
+}else{
+
+  connectLobby()
+    .catch(() => {});
 }
-
-startMode(b.dataset.mode);
-};
-});
-
-$("cancel").onclick=
-leaveToHome;
-
-$("matchBack").onclick=
-leaveToHome;
-
-$("retry").onclick=
-()=>startMode(currentMode||"face");
-
-$("faceBack").onclick=
-leaveToHome;
-
-$("chatBack").onclick=
-leaveToHome;
-
-$("huntBack").onclick=
-leaveToHome;
-
-$("faceSkip").onclick=
-skip;
-
-$("chatSkip").onclick=
-skip;
-
-$("huntSkip").onclick=
-skip;
-
-$("faceQuit").onclick=
-leaveToHome;
-
-$("chatQuit").onclick=
-leaveToHome;
-
-$("huntQuit").onclick=
-leaveToHome;
-
-$("faceReport").onclick=
-()=>openReport("face");
-
-$("chatReport").onclick=
-()=>openReport("chat");
-
-$("huntReport").onclick=
-()=>openReport("hunt");
-
-$("reportCancel").onclick=
-closeReport;
-
-$("reportSubmit").onclick=
-submitReport;
-
-$("reportModal").addEventListener(
-"click",
-e=>{
-if(e.target.id==="reportModal"){
-closeReport();
-}
-}
-);
-
-$("chatSend").onclick=
-sendChat;
-
-$("chatInput").addEventListener(
-"keydown",
-e=>{
-if(e.key==="Enter"){
-sendChat();
-}
-}
-);
-
-window.addEventListener(
-"beforeunload",
-()=>{
-closeConnection();
-stopCamera();
-}
-);
-
-$("friendsToggle").onclick=
-openFriends;
-
-$("friendsClose").onclick=
-closeFriends;
-
-$("dmSend").onclick=
-sendDm;
-
-$("dmInput").addEventListener(
-"keydown",
-e=>{
-if(e.key==="Enter"){
-sendDm();
-}
-}
-);
-
-$("friendsModal").addEventListener(
-"click",
-e=>{
-if(e.target.id==="friendsModal"){
-closeFriends();
-}
-}
-);
-
-$("facePlayAgain").onclick=()=>{
-if(
-ws?.readyState===1 &&
-!rematchSent
-){
-rematchSent=true;
-
-ws.send(JSON.stringify({
-type:"rematch-ready"
-}));
-}
-};
-
-$("huntPlayAgain").onclick=()=>{
-if(
-ws?.readyState===1 &&
-!rematchSent
-){
-rematchSent=true;
-
-ws.send(JSON.stringify({
-type:"rematch-ready"
-}));
-}
-};
-
-$("chatPlayAgain").onclick=()=>{
-if(
-ws?.readyState===1 &&
-!rematchSent
-){
-rematchSent=true;
-
-ws.send(JSON.stringify({
-type:"rematch-ready"
-}));
-}
-};
-
-$("huntSkipItem").onclick=()=>{
-if(ws?.readyState===1){
-ws.send(JSON.stringify({
-type:"skip-item"
-}));
-}
-};
 
 </script>
 </body>
