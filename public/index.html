@@ -3,236 +3,1484 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Emoji Face-Off</title>
+<title>EmojiTV — Emoji Face-Off</title>
+
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:#080b16;color:#fff;min-height:100vh}
-button{font:inherit;border:0;cursor:pointer}.app{max-width:1200px;margin:auto;padding:24px}
-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}.brand{font-size:24px;font-weight:900}.pill{padding:8px 12px;border-radius:999px;background:#151a2b;color:#b9c4df;font-size:13px}
-.screen{display:none}.screen.active{display:block}.hero{text-align:center;padding:70px 20px}.hero h1{font-size:clamp(44px,8vw,82px);margin:0 0 12px}.hero p{color:#aeb7ce;font-size:18px}
-.primary{background:#fff;color:#080b16;padding:15px 24px;border-radius:14px;font-weight:900;font-size:18px;margin-top:18px}.secondary{background:#151a2b;color:#fff;padding:12px 18px;border-radius:12px}
-.card{background:#101525;border:1px solid #202a43;border-radius:20px;padding:18px}.status{text-align:center;margin:10px 0 18px;color:#aeb7ce}
-.videos{display:grid;grid-template-columns:1fr 1fr;gap:16px}.videoCard{position:relative;background:#05070c;border-radius:18px;overflow:hidden;min-height:300px;border:1px solid #202a43}.videoCard video{width:100%;height:100%;min-height:300px;display:block;object-fit:cover;transform:scaleX(-1);background:#05070c}.videoCard.opponent video{transform:none}.label{position:absolute;top:12px;left:12px;background:#000b;padding:7px 10px;border-radius:10px;font-size:13px;z-index:2}.emoji{text-align:center;font-size:110px;margin:12px}.round{text-align:center;color:#aeb7ce;margin-bottom:10px}.controls{display:flex;justify-content:center;gap:10px;margin-top:16px;flex-wrap:wrap}.notice{display:none;padding:14px;border-radius:14px;background:#2b1620;color:#ffd4df;margin:12px 0}.notice.show{display:block}.tiny{font-size:13px;color:#8994ad;text-align:center;margin-top:14px}.spinner{font-size:48px;text-align:center;animation:spin 1.2s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
-@media(max-width:760px){.videos{grid-template-columns:1fr}.videoCard,.videoCard video{min-height:240px}}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Inter,system-ui,Arial,sans-serif;
+  background:#080b16;
+  color:#fff;
+  min-height:100vh
+}
+button{
+  font:inherit;
+  border:0;
+  cursor:pointer
+}
+.app{
+  max-width:1200px;
+  margin:auto;
+  padding:24px;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column
+}
+header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:22px
+}
+.brand{
+  font-size:24px;
+  font-weight:900
+}
+.pill{
+  padding:8px 12px;
+  border-radius:999px;
+  background:#151a2b;
+  color:#b9c4df;
+  font-size:13px
+}
+.screen{display:none}
+.screen.active{display:block}
+.hero{
+  text-align:center;
+  padding:58px 20px
+}
+.hero h1{
+  font-size:clamp(44px,8vw,82px);
+  margin:0 0 12px
+}
+.hero p{
+  color:#aeb7ce;
+  font-size:18px
+}
+.primary{
+  background:#fff;
+  color:#080b16;
+  padding:15px 24px;
+  border-radius:14px;
+  font-weight:900;
+  font-size:18px;
+  margin-top:18px
+}
+.secondary{
+  background:#151a2b;
+  color:#fff;
+  padding:12px 18px;
+  border-radius:12px
+}
+.danger{
+  background:#3a1821;
+  color:#fff
+}
+.card{
+  background:#101525;
+  border:1px solid #202a43;
+  border-radius:20px;
+  padding:18px
+}
+.status{
+  text-align:center;
+  margin:10px 0 18px;
+  color:#aeb7ce
+}
+.videos{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px
+}
+.videoCard{
+  position:relative;
+  background:#05070c;
+  border-radius:18px;
+  overflow:hidden;
+  min-height:300px;
+  border:1px solid #202a43
+}
+.videoCard video{
+  width:100%;
+  height:100%;
+  min-height:300px;
+  display:block;
+  object-fit:cover;
+  transform:scaleX(-1);
+  background:#05070c
+}
+.videoCard.opponent video{
+  transform:none
+}
+.label{
+  position:absolute;
+  top:12px;
+  left:12px;
+  background:#000b;
+  padding:7px 10px;
+  border-radius:10px;
+  font-size:13px;
+  z-index:2
+}
+.emoji{
+  text-align:center;
+  font-size:110px;
+  margin:8px
+}
+.round{
+  text-align:center;
+  color:#aeb7ce;
+  margin-bottom:4px
+}
+.scorebar{
+  display:flex;
+  justify-content:center;
+  gap:14px;
+  flex-wrap:wrap;
+  margin:8px 0 12px
+}
+.score{
+  background:#101525;
+  border:1px solid #202a43;
+  border-radius:12px;
+  padding:8px 14px;
+  color:#dce4f7
+}
+.live-score{
+  font-weight:900;
+  color:#fff
+}
+.controls{
+  display:flex;
+  justify-content:center;
+  gap:10px;
+  margin-top:16px;
+  flex-wrap:wrap
+}
+.notice{
+  display:none;
+  padding:14px;
+  border-radius:14px;
+  background:#2b1620;
+  color:#ffd4df;
+  margin:12px 0
+}
+.notice.show{display:block}
+.tiny{
+  font-size:13px;
+  color:#8994ad;
+  text-align:center;
+  margin-top:14px
+}
+.spinner{
+  font-size:48px;
+  text-align:center;
+  animation:spin 1.2s linear infinite
+}
+@keyframes spin{
+  to{transform:rotate(360deg)}
+}
+.countdown{
+  font-size:26px;
+  font-weight:900;
+  text-align:center;
+  margin:8px
+}
+.result{
+  text-align:center;
+  font-size:24px;
+  font-weight:900;
+  margin:12px
+}
+.footer{
+  text-align:center;
+  color:#68738d;
+  font-size:13px;
+  margin-top:auto;
+  padding-top:24px
+}
+.face-status{
+  text-align:center;
+  color:#9faac2;
+  font-size:13px;
+  min-height:20px
+}
+@media(max-width:760px){
+  .videos{
+    grid-template-columns:1fr
+  }
+  .videoCard,
+  .videoCard video{
+    min-height:240px
+  }
+  .hero{
+    padding-top:30px
+  }
+}
 </style>
 </head>
+
 <body>
+
 <div class="app">
-<header><div class="brand">🎭 Emoji Face-Off</div><div class="pill" id="connection">Not connected</div></header>
+
+<header>
+  <div class="brand">🎭 EmojiTV</div>
+  <div class="pill" id="connection">Not connected</div>
+</header>
 
 <section id="home" class="screen active">
+
   <div class="hero">
-    <div class="emoji">😎</div><h1>Emoji Face-Off</h1>
-    <p>Copy the emoji. Beat your opponent. Win the round.</p>
-    <button class="primary" id="play">PLAY NOW</button>
-    <div class="tiny">Your camera stays on this page and is used for the game.</div>
+
+    <div class="emoji">😎</div>
+
+    <h1>Emoji Face-Off</h1>
+
+    <p>
+      Copy the emoji. Beat your opponent. Win the round.
+    </p>
+
+    <button class="primary" id="play">
+      PLAY NOW
+    </button>
+
+    <div class="tiny">
+      Random matchmaking • 5 rounds • Camera-based scoring
+    </div>
+
   </div>
+
 </section>
 
 <section id="match" class="screen">
+
   <div class="card">
+
     <div class="spinner">⏳</div>
-    <h2 style="text-align:center">Getting you into the game...</h2>
-    <p class="status" id="matchStatus">Starting camera...</p>
+
+    <h2 style="text-align:center">
+      Finding an opponent...
+    </h2>
+
+    <p class="status" id="matchStatus">
+      Starting camera...
+    </p>
+
     <div class="videos">
-      <div class="videoCard"><span class="label">YOU</span><video id="localWaiting" autoplay muted playsinline></video></div>
-      <div class="videoCard opponent"><span class="label">OPPONENT</span><video id="remoteWaiting" autoplay playsinline></video></div>
+
+      <div class="videoCard">
+        <span class="label">YOU</span>
+        <video
+          id="localWaiting"
+          autoplay
+          muted
+          playsinline>
+        </video>
+      </div>
+
+      <div class="videoCard opponent">
+        <span class="label">OPPONENT</span>
+        <video
+          id="remoteWaiting"
+          autoplay
+          playsinline>
+        </video>
+      </div>
+
     </div>
+
     <div id="error" class="notice"></div>
-    <div class="controls"><button class="secondary" id="cancel">CANCEL</button><button class="secondary" id="retry" style="display:none">RETRY</button></div>
+
+    <div class="controls">
+
+      <button class="secondary" id="cancel">
+        CANCEL
+      </button>
+
+      <button
+        class="secondary"
+        id="retry"
+        style="display:none">
+        RETRY
+      </button>
+
+    </div>
+
   </div>
+
 </section>
 
 <section id="game" class="screen">
-  <div class="round" id="roundText">Round 1 of 5</div>
-  <div class="emoji" id="target">😎</div>
-  <div class="videos">
-    <div class="videoCard"><span class="label">YOU</span><video id="localGame" autoplay muted playsinline></video></div>
-    <div class="videoCard opponent"><span class="label">OPPONENT</span><video id="remoteGame" autoplay playsinline></video></div>
+
+  <div class="round" id="roundText">
+    Round 1 of 5
   </div>
-  <div class="controls"><button class="secondary" id="quit">QUIT GAME</button></div>
+
+  <div class="emoji" id="target">
+    😎
+  </div>
+
+  <div class="countdown" id="countdown">
+    Get ready!
+  </div>
+
+  <div class="scorebar">
+
+    <div class="score">
+      Your score:
+      <span class="live-score" id="yourScore">0</span>
+    </div>
+
+    <div class="score">
+      Opponent:
+      <span class="live-score" id="opponentScore">0</span>
+    </div>
+
+  </div>
+
+  <div class="videos">
+
+    <div class="videoCard">
+
+      <span class="label">YOU</span>
+
+      <video
+        id="localGame"
+        autoplay
+        muted
+        playsinline>
+      </video>
+
+    </div>
+
+    <div class="videoCard opponent">
+
+      <span class="label">OPPONENT</span>
+
+      <video
+        id="remoteGame"
+        autoplay
+        playsinline>
+      </video>
+
+    </div>
+
+  </div>
+
+  <div class="face-status" id="faceStatus">
+    Loading face scoring…
+  </div>
+
+  <div class="result" id="result"></div>
+
+  <div class="controls">
+
+    <button class="secondary" id="skip">
+      SKIP — PLAY SOMEONE ELSE
+    </button>
+
+    <button class="secondary danger" id="quit">
+      QUIT GAME
+    </button>
+
+  </div>
+
 </section>
+
+<footer class="footer">
+  Made by Tyler Levy
+</footer>
+
 </div>
 
-<script>
+<script type="module">
+
 const $ = id => document.getElementById(id);
-const screens = ["home","match","game"];
-let stream = null, ws = null, pc = null, role = null, connecting = false;
-let matchTimer = null;
+
+const screens = [
+  "home",
+  "match",
+  "game"
+];
+
+const TOTAL_ROUNDS = 5;
+
+let stream = null;
+let ws = null;
+let pc = null;
+let role = null;
+let connecting = false;
+
+let faceLandmarker = null;
+let animationFrame = null;
+let scoreTimer = null;
+let roundActive = false;
+let lastScore = 0;
+let roundToken = 0;
 
 function show(name){
-  screens.forEach(x => $(x).classList.toggle("active", x === name));
+  screens.forEach(x =>
+    $(x).classList.toggle(
+      "active",
+      x === name
+    )
+  );
 }
+
 function setError(text){
+
   $("error").textContent = text;
+
   $("error").classList.add("show");
+
   $("retry").style.display = "inline-block";
 }
+
 function clearError(){
+
   $("error").textContent = "";
+
   $("error").classList.remove("show");
+
   $("retry").style.display = "none";
 }
+
 function setLocalVideos(){
+
   if(!stream) return;
-  ["localWaiting","localGame"].forEach(id => $(id).srcObject = stream);
+
+  ["localWaiting","localGame"].forEach(id => {
+    $(id).srcObject = stream;
+  });
+
 }
+
 function stopCamera(){
-  if(stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
-  ["localWaiting","localGame"].forEach(id => $(id).srcObject = null);
+
+  if(stream){
+
+    stream
+      .getTracks()
+      .forEach(t => t.stop());
+
+    stream = null;
+
+  }
+
+  ["localWaiting","localGame"].forEach(id => {
+    $(id).srcObject = null;
+  });
+
 }
+
 async function getCameraAndMic(){
-  // This function is ONLY responsible for camera/mic permission.
-  if(!window.isSecureContext && location.hostname !== "localhost"){
+
+  if(
+    !window.isSecureContext &&
+    location.hostname !== "localhost"
+  ){
     throw new Error("secure");
   }
-  stream = await navigator.mediaDevices.getUserMedia({
-    video:{width:{ideal:1280},height:{ideal:720},facingMode:"user"},
-    audio:true
-  });
+
+  stream =
+    await navigator.mediaDevices.getUserMedia({
+
+      video:{
+        width:{ideal:1280},
+        height:{ideal:720},
+        facingMode:"user"
+      },
+
+      audio:true
+
+    });
+
   setLocalVideos();
-  // Force the browser to render the camera immediately.
-  await $("localWaiting").play().catch(()=>{});
-  $("matchStatus").textContent = "Camera connected! Finding an opponent...";
+
+  await $("localWaiting")
+    .play()
+    .catch(()=>{});
+
+  $("matchStatus").textContent =
+    "Camera connected! Finding an opponent...";
+
 }
+
 function wsUrl(){
-  if(location.protocol === "file:") return null;
-  return (location.protocol === "https:" ? "wss://" : "ws://") + location.host;
+
+  if(location.protocol === "file:")
+    return null;
+
+  return (
+    location.protocol === "https:"
+      ? "wss://"
+      : "ws://"
+  ) + location.host;
+
 }
+
 function closeConnection(){
-  if(ws){ try{ws.close();}catch{} ws=null; }
-  if(pc){ try{pc.close();}catch{} pc=null; }
-}
-async function connectToServer(){
-  if(connecting) return;
-  connecting = true;
-  clearError();
-  const url = wsUrl();
-  if(!url){
-    connecting=false;
-    throw new Error("file");
+
+  if(ws){
+
+    try{
+      ws.close();
+    }catch{}
+
+    ws = null;
   }
-  $("matchStatus").textContent = "Camera connected! Connecting to the game server...";
-  return new Promise((resolve,reject)=>{
-    let settled=false;
-    const finish=(ok,err)=>{
-      if(settled)return; settled=true; connecting=false;
-      clearTimeout(timer);
-      ok?resolve():reject(err);
-    };
-    ws = new WebSocket(url);
-    const timer=setTimeout(()=>finish(false,new Error("timeout")),8000);
-    ws.onopen=()=>{
-      $("connection").textContent="Connected";
-      $("matchStatus").textContent="Camera connected! Finding an opponent...";
-      ws.send(JSON.stringify({type:"find-match"}));
-      finish(true);
-    };
-    ws.onerror=()=>finish(false,new Error("server"));
-    ws.onclose=()=>{
-      $("connection").textContent="Not connected";
-      if(!settled) finish(false,new Error("server"));
-    };
-    ws.onmessage=async e=>{
-      let m; try{m=JSON.parse(e.data)}catch{return}
-      if(m.type==="waiting") $("matchStatus").textContent="Camera is live ✓  Waiting for another player...";
-      if(m.type==="matched"){
-        role=m.role;
-        $("matchStatus").textContent="Opponent found! Starting the game...";
-        await setupPeer(role);
-        show("game");
-        setLocalVideos();
-        setTimeout(()=>$("localGame").play().catch(()=>{}),50);
-        $("target").textContent=["😎","😮","😡","😂","😐"][Math.floor(Math.random()*5)];
-        $("roundText").textContent="Round 1 of 5";
-      }
-      if(m.type==="signal") handleSignal(m);
-      if(m.type==="opponent-left"){
-        closeConnection();
-        $("matchStatus").textContent="Your opponent left. You can retry.";
-        setError("Your opponent disconnected.");
-        show("match");
-      }
-    };
-  });
-}
-async function setupPeer(myRole){
-  pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
-  stream.getTracks().forEach(t=>pc.addTrack(t,stream));
-  pc.ontrack=e=>{
-    const v=$("remoteGame");
-    v.srcObject=e.streams[0];
-    $("remoteWaiting").srcObject=e.streams[0];
-    v.play().catch(()=>{});
-  };
-  pc.onicecandidate=e=>{
-    if(e.candidate && ws?.readyState===1) ws.send(JSON.stringify({type:"signal",signal:{candidate:e.candidate}}));
-  };
-  if(myRole==="a"){
-    const offer=await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    ws.send(JSON.stringify({type:"signal",signal:{description:pc.localDescription}}));
+
+  if(pc){
+
+    try{
+      pc.close();
+    }catch{}
+
+    pc = null;
   }
+
 }
-async function handleSignal(m){
-  if(!pc) return;
-  const s=m.signal;
+
+async function loadFaceScoring(){
+
+  if(faceLandmarker)
+    return faceLandmarker;
+
   try{
-    if(s.description){
-      await pc.setRemoteDescription(s.description);
-      if(s.description.type==="offer"){
-        const answer=await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        ws.send(JSON.stringify({type:"signal",signal:{description:pc.localDescription}}));
-      }
-    }else if(s.candidate){
-      await pc.addIceCandidate(s.candidate);
-    }
-  }catch(err){ console.warn("WebRTC signal error",err); }
-}
-async function start(){
-  show("match");
-  clearError();
-  $("matchStatus").textContent="Requesting camera and microphone...";
-  $("connection").textContent="Camera starting...";
-  try{
-    // IMPORTANT: permission errors are caught separately.
-    await getCameraAndMic();
+
+    const vision =
+      await import(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/vision_bundle.mjs"
+      );
+
+    const {
+      FaceLandmarker,
+      FilesetResolver
+    } = vision;
+
+    const fileset =
+      await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/wasm"
+      );
+
+    faceLandmarker =
+      await FaceLandmarker.createFromOptions(
+        fileset,
+        {
+          baseOptions:{
+            modelAssetPath:
+              "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+            delegate:"GPU"
+          },
+
+          runningMode:"VIDEO",
+
+          numFaces:1,
+
+          outputFaceBlendshapes:true,
+
+          outputFacialTransformationMatrixes:false
+        }
+      );
+
+    $("faceStatus").textContent =
+      "Face scoring is ready ✓";
+
+    return faceLandmarker;
+
   }catch(err){
-    $("connection").textContent="Camera not connected";
-    if(err?.name==="NotAllowedError"){
-      setError("Camera/microphone access was blocked. Click the camera icon near your browser address bar and allow Camera and Microphone, then press RETRY.");
-    }else if(err?.name==="NotFoundError"){
-      setError("No camera or microphone was found. Check that your Logitech/FIFINE devices are plugged in.");
-    }else if(err?.message==="secure"){
-      setError("Open this game using http://localhost:3000. Do not double-click the HTML file.");
-    }else{
-      setError("We couldn't start the camera. Check your browser's camera and microphone permissions, then press RETRY.");
+
+    console.error(err);
+
+    $("faceStatus").textContent =
+      "Face scoring could not load — check your internet connection.";
+
+    return null;
+
+  }
+
+}
+
+function blend(results,name){
+
+  const cats =
+    results?.faceBlendshapes?.[0]?.categories || [];
+
+  const c =
+    cats.find(
+      x => x.categoryName === name
+    );
+
+  return c ? c.score : 0;
+
+}
+
+function expressionScore(target,r){
+
+  if(!r?.faceLandmarks?.length)
+    return 0;
+
+  const smile =
+    (
+      blend(r,"mouthSmileLeft") +
+      blend(r,"mouthSmileRight")
+    ) / 2;
+
+  const squint =
+    (
+      blend(r,"eyeSquintLeft") +
+      blend(r,"eyeSquintRight")
+    ) / 2;
+
+  const open =
+    blend(r,"jawOpen");
+
+  const funnel =
+    blend(r,"mouthFunnel");
+
+  const brow =
+    (
+      blend(r,"browDownLeft") +
+      blend(r,"browDownRight")
+    ) / 2;
+
+  const press =
+    (
+      blend(r,"mouthPressLeft") +
+      blend(r,"mouthPressRight")
+    ) / 2;
+
+  let value = 0;
+
+  if(target === "😂")
+    value =
+      0.65 * smile +
+      0.35 * squint;
+
+  else if(target === "😮")
+    value =
+      0.75 * open +
+      0.25 * funnel;
+
+  else if(target === "😡")
+    value =
+      0.65 * brow +
+      0.35 * press;
+
+  else if(target === "😎")
+    value =
+      0.6 * smile +
+      0.4 * squint;
+
+  else if(target === "😐")
+    value =
+      Math.max(
+        0,
+        1 -
+        (smile + open + brow) * 0.55
+      );
+
+  return Math.round(
+    Math.max(
+      0,
+      Math.min(
+        100,
+        value * 100
+      )
+    )
+  );
+
+}
+
+function startFaceScoring(){
+
+  if(animationFrame)
+    cancelAnimationFrame(animationFrame);
+
+  const loop = () => {
+
+    if(!roundActive){
+
+      animationFrame = null;
+      return;
+
     }
+
+    if(
+      faceLandmarker &&
+      $("localGame").readyState >= 2
+    ){
+
+      try{
+
+        const r =
+          faceLandmarker.detectForVideo(
+            $("localGame"),
+            performance.now()
+          );
+
+        lastScore =
+          expressionScore(
+            $("target").textContent,
+            r
+          );
+
+        $("yourScore").textContent =
+          lastScore;
+
+      }catch(e){}
+
+    }
+
+    animationFrame =
+      requestAnimationFrame(loop);
+
+  };
+
+  animationFrame =
+    requestAnimationFrame(loop);
+
+}
+
+function stopFaceScoring(){
+
+  roundActive = false;
+
+  if(animationFrame)
+    cancelAnimationFrame(animationFrame);
+
+  animationFrame = null;
+
+}
+
+function setTarget(target){
+
+  $("target").textContent =
+    target;
+
+  $("yourScore").textContent =
+    "0";
+
+  $("opponentScore").textContent =
+    "0";
+
+  $("result").textContent =
+    "";
+
+}
+
+function runRound(round,target){
+
+  roundToken++;
+
+  const token =
+    roundToken;
+
+  roundActive = false;
+
+  if(scoreTimer)
+    clearTimeout(scoreTimer);
+
+  $("roundText").textContent =
+    `Round ${round} of ${TOTAL_ROUNDS}`;
+
+  setTarget(target);
+
+  $("countdown").textContent =
+    "GET READY!";
+
+  setTimeout(() => {
+
+    if(token !== roundToken)
+      return;
+
+    $("countdown").textContent =
+      "3";
+
+  },700);
+
+  setTimeout(() => {
+
+    if(token !== roundToken)
+      return;
+
+    $("countdown").textContent =
+      "2";
+
+  },1400);
+
+  setTimeout(() => {
+
+    if(token !== roundToken)
+      return;
+
+    $("countdown").textContent =
+      "1";
+
+  },2100);
+
+  setTimeout(() => {
+
+    if(token !== roundToken)
+      return;
+
+    $("countdown").textContent =
+      "MAKE THE FACE!";
+
+    roundActive = true;
+
+    startFaceScoring();
+
+    scoreTimer =
+      setTimeout(
+        () => finishRound(round,token),
+        7000
+      );
+
+  },2800);
+
+}
+
+function finishRound(round,token){
+
+  if(token !== roundToken)
     return;
+
+  stopFaceScoring();
+
+  $("countdown").textContent =
+    "ROUND OVER!";
+
+  if(
+    ws &&
+    ws.readyState === 1
+  ){
+
+    ws.send(
+      JSON.stringify({
+        type:"round-score",
+        score:lastScore,
+        round
+      })
+    );
+
   }
 
-  // Camera is now definitely working and visible BEFORE server connection starts.
-  $("connection").textContent="Camera connected";
-  setLocalVideos();
-  await new Promise(r=>setTimeout(r,150));
-  $("localWaiting").scrollIntoView({block:"center",behavior:"smooth"});
+}
+
+async function connectToServer(){
+
+  if(connecting)
+    return;
+
+  connecting = true;
+
+  clearError();
+
+  const url =
+    wsUrl();
+
+  if(!url){
+
+    connecting = false;
+
+    throw new Error("file");
+
+  }
+
+  $("matchStatus").textContent =
+    "Camera connected! Connecting to the game server...";
+
+  return new Promise(
+    (resolve,reject) => {
+
+      let settled = false;
+
+      const finish =
+        (ok,err) => {
+
+          if(settled)
+            return;
+
+          settled = true;
+
+          connecting = false;
+
+          clearTimeout(timer);
+
+          ok
+            ? resolve()
+            : reject(err);
+
+        };
+
+      ws =
+        new WebSocket(url);
+
+      const timer =
+        setTimeout(
+          () =>
+            finish(
+              false,
+              new Error("timeout")
+            ),
+          10000
+        );
+
+      ws.onopen = () => {
+
+        $("connection").textContent =
+          "Connected";
+
+        $("matchStatus").textContent =
+          "Camera connected! Finding an opponent...";
+
+        ws.send(
+          JSON.stringify({
+            type:"find-match"
+          })
+        );
+
+        finish(true);
+
+      };
+
+      ws.onerror = () =>
+        finish(
+          false,
+          new Error("server")
+        );
+
+      ws.onclose = () => {
+
+        $("connection").textContent =
+          "Not connected";
+
+        if(!settled)
+          finish(
+            false,
+            new Error("server")
+          );
+
+      };
+
+      ws.onmessage =
+        async e => {
+
+          let m;
+
+          try{
+            m =
+              JSON.parse(e.data);
+          }catch{
+            return;
+          }
+
+          if(m.type === "waiting"){
+
+            $("matchStatus").textContent =
+              "Camera is live ✓ Waiting for another player...";
+
+          }
+
+          if(m.type === "matched"){
+
+            role =
+              m.role;
+
+            $("matchStatus").textContent =
+              "Opponent found! Starting the game...";
+
+            await setupPeer(role);
+
+            show("game");
+
+            setLocalVideos();
+
+            setTimeout(
+              () =>
+                $("localGame")
+                  .play()
+                  .catch(()=>{}),
+              50
+            );
+
+            loadFaceScoring();
+
+            runRound(
+              m.round || 1,
+              m.target || "😎"
+            );
+
+          }
+
+          if(m.type === "signal")
+            handleSignal(m);
+
+          if(m.type === "opponent-score"){
+
+            $("opponentScore").textContent =
+              m.score;
+
+            showRoundResultIfBoth();
+
+          }
+
+          if(m.type === "your-score"){
+
+            $("yourScore").textContent =
+              m.score;
+
+            lastScore =
+              m.score;
+
+            showRoundResultIfBoth();
+
+          }
+
+          if(m.type === "new-round"){
+
+            runRound(
+              m.round,
+              m.target
+            );
+
+          }
+
+          if(m.type === "game-over"){
+
+            $("countdown").textContent =
+              "GAME OVER!";
+
+            $("result").textContent =
+              "Thanks for playing!";
+
+            stopFaceScoring();
+
+          }
+
+          if(m.type === "opponent-left"){
+
+            closeConnection();
+
+            stopFaceScoring();
+
+            $("matchStatus").textContent =
+              "Your opponent left. Finding someone new...";
+
+            clearError();
+
+            show("match");
+
+            connectToServer()
+              .catch(()=>{});
+
+          }
+
+        };
+
+    }
+  );
+
+}
+
+function showRoundResultIfBoth(){
+
+  if(
+    $("countdown").textContent !==
+    "ROUND OVER!"
+  )
+    return;
+
+  const your =
+    Number(
+      $("yourScore").textContent
+    );
+
+  const opp =
+    Number(
+      $("opponentScore").textContent
+    );
+
+  if(your === 0 && opp === 0)
+    return;
+
+  $("result").textContent =
+    your > opp
+      ? "🏆 YOU WIN THIS ROUND!"
+      : your < opp
+        ? "😮 OPPONENT WINS THIS ROUND!"
+        : "🤝 TIE!";
+
+  if(
+    ws &&
+    ws.readyState === 1
+  ){
+
+    setTimeout(
+      () =>
+        ws.send(
+          JSON.stringify({
+            type:"next-round"
+          })
+        ),
+      1200
+    );
+
+  }
+
+}
+
+async function setupPeer(myRole){
+
+  pc =
+    new RTCPeerConnection({
+
+      iceServers:[
+        {
+          urls:
+            "stun:stun.l.google.com:19302"
+        }
+      ]
+
+    });
+
+  stream
+    .getTracks()
+    .forEach(
+      t =>
+        pc.addTrack(t,stream)
+    );
+
+  pc.ontrack =
+    e => {
+
+      $("remoteGame").srcObject =
+        e.streams[0];
+
+      $("remoteWaiting").srcObject =
+        e.streams[0];
+
+      $("remoteGame")
+        .play()
+        .catch(()=>{});
+
+    };
+
+  pc.onicecandidate =
+    e => {
+
+      if(
+        e.candidate &&
+        ws &&
+        ws.readyState === 1
+      ){
+
+        ws.send(
+          JSON.stringify({
+            type:"signal",
+            signal:{
+              candidate:e.candidate
+            }
+          })
+        );
+
+      }
+
+    };
+
+  if(myRole === "a"){
+
+    const offer =
+      await pc.createOffer();
+
+    await pc.setLocalDescription(
+      offer
+    );
+
+    ws.send(
+      JSON.stringify({
+        type:"signal",
+        signal:{
+          description:
+            pc.localDescription
+        }
+      })
+    );
+
+  }
+
+}
+
+async function handleSignal(m){
+
+  if(!pc)
+    return;
+
+  const s =
+    m.signal;
 
   try{
-    await connectToServer();
-  }catch(err){
-    $("connection").textContent="Server not connected";
-    if(err.message==="file"){
-      setError("You're viewing the HTML file directly. Start the game with npm start, then open http://localhost:3000.");
-    }else{
-      setError("Your camera is working, but the game server is not connected. Make sure the game was started with npm start, then press RETRY.");
+
+    if(s.description){
+
+      await pc.setRemoteDescription(
+        s.description
+      );
+
+      if(
+        s.description.type === "offer"
+      ){
+
+        const answer =
+          await pc.createAnswer();
+
+        await pc.setLocalDescription(
+          answer
+        );
+
+        ws.send(
+          JSON.stringify({
+            type:"signal",
+            signal:{
+              description:
+                pc.localDescription
+            }
+          })
+        );
+
+      }
+
+    }else if(s.candidate){
+
+      await pc.addIceCandidate(
+        s.candidate
+      );
+
     }
+
+  }catch(err){
+
+    console.warn(
+      "WebRTC signal error",
+      err
+    );
+
   }
+
 }
-$("play").onclick=start;
-$("retry").onclick=start;
-$("cancel").onclick=()=>{closeConnection();stopCamera();show("home");$("connection").textContent="Not connected";};
-$("quit").onclick=()=>{if(ws?.readyState===1)ws.send(JSON.stringify({type:"leave"}));closeConnection();stopCamera();show("home");$("connection").textContent="Not connected";};
-window.addEventListener("beforeunload",()=>{closeConnection();stopCamera()});
+
+async function start(){
+
+  show("match");
+
+  clearError();
+
+  $("matchStatus").textContent =
+    "Requesting camera and microphone...";
+
+  $("connection").textContent =
+    "Camera starting...";
+
+  try{
+
+    await getCameraAndMic();
+
+  }catch(err){
+
+    $("connection").textContent =
+      "Camera not connected";
+
+    if(
+      err?.name ===
+      "NotAllowedError"
+    ){
+
+      setError(
+        "Camera/microphone access was blocked. Allow Camera and Microphone in your browser, then press RETRY."
+      );
+
+    }else if(
+      err?.name ===
+      "NotFoundError"
+    ){
+
+      setError(
+        "No camera or microphone was found. Check that your devices are plugged in."
+      );
+
+    }else if(
+      err?.message === "secure"
+    ){
+
+      setError(
+        "Open this game using https://emojitv.onrender.com or http://localhost:3000."
+      );
+
+    }else{
+
+      setError(
+        "We couldn't start the camera. Check browser permissions, then press RETRY."
+      );
+
+    }
+
+    return;
+
+  }
+
+  $("connection").textContent =
+    "Camera connected";
+
+  setLocalVideos();
+
+  await new Promise(
+    r => setTimeout(r,150)
+  );
+
+  try{
+
+    await connectToServer();
+
+  }catch(err){
+
+    $("connection").textContent =
+      "Server not connected";
+
+    if(err.message === "file"){
+
+      setError(
+        "You're viewing the HTML file directly. Use the published website or start the game with npm start."
+      );
+
+    }else{
+
+      setError(
+        "Your camera is working, but the game server is not connected. Press RETRY."
+      );
+
+    }
+
+  }
+
+}
+
+async function skipOpponent(){
+
+  stopFaceScoring();
+
+  roundToken++;
+
+  if(scoreTimer)
+    clearTimeout(scoreTimer);
+
+  if(
+    ws &&
+    ws.readyState === 1
+  ){
+
+    ws.send(
+      JSON.stringify({
+        type:"skip"
+      })
+    );
+
+  }
+
+  if(pc){
+
+    try{
+      pc.close();
+    }catch{}
+
+    pc = null;
+
+  }
+
+  $("remoteGame").srcObject =
+    null;
+
+  $("remoteWaiting").srcObject =
+    null;
+
+  $("matchStatus").textContent =
+    "Finding someone new...";
+
+  $("connection").textContent =
+    "Searching...";
+
+  show("match");
+
+}
+
+$("play").onclick =
+  start;
+
+$("retry").onclick =
+  start;
+
+$("cancel").onclick =
+  () => {
+
+    closeConnection();
+
+    stopCamera();
+
+    stopFaceScoring();
+
+    show("home");
+
+    $("connection").textContent =
+      "Not connected";
+
+  };
+
+$("skip").onclick =
+  skipOpponent;
+
+$("quit").onclick =
+  () => {
+
+    if(
+      ws &&
+      ws.readyState === 1
+    ){
+
+      ws.send(
+        JSON.stringify({
+          type:"leave"
+        })
+      );
+
+    }
+
+    closeConnection();
+
+    stopCamera();
+
+    stopFaceScoring();
+
+    show("home");
+
+    $("connection").textContent =
+      "Not connected";
+
+  };
+
+window.addEventListener(
+  "beforeunload",
+  () => {
+
+    closeConnection();
+
+    stopCamera();
+
+  }
+);
+
 </script>
+
 </body>
 </html>
