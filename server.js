@@ -1,1058 +1,1344 @@
-import express from "express";
-import http from "http";
-import { WebSocketServer } from "ws";
-import path from "path";
-import { fileURLToPath } from "url";
-import crypto from "crypto";
+const express = require("express");
+const http = require("http");
+const WebSocket = require("ws");
+const path = require("path");
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocket.Server({ server });
 
-const waiting = [];
+const PORT = process.env.PORT || 3000;
+
+app.use(express.static(path.join(__dirname, "public")));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+const clients = new Map();
+const waiting = new Map();
 const rooms = new Map();
-const clients = new Set();
-const leaderboard = { face: new Map(), hunt: new Map(), chat: new Map() };
-const reports = [];
-const MAX_REPORTS = 5000;
+
+const leaderboards = {
+  face: new Map(),
+  hunt: new Map(),
+  chat: new Map()
+};
+
 const friends = new Map();
 const friendRequests = new Map();
 const dmHistory = new Map();
 const pendingInvites = new Map();
 
-
-const EMOJIS = [
-  "😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇","🙂","🙃","😉","😌","😍","🥰","😘","😗","😙","😚","😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🤩","🥳","🤗","🫠","🫡","🤔","🫢","🫣","🫤","🫥","😐","😑","😶","🫨","😏","😒","🙄","😬","🤥","😶‍🌫️","😴","🤤","😪","😵","😵‍💫","🤐","🤢","🤮","🤧","😷","🤒","🤕","🥴","🥶","🥵","😳","😯","😦","😧","😟","😕","🙁","☹️","😞","😔","😢","😭","😥","😓","😰","😨","😱","😖","😣","😫","😩","🥺","🥹","😠","😡","🤬","😤","😮‍💨","😮","😲","🤯","🤭","🤫","🤠","🥸","😈","👿","💀","☠️","👻","👽","🤖","🎃","😺","😸","😹","😻","😼","😽","🙀","😿","😾"
-];
-
-const HUNT_ITEMS = [
-  { emoji: "🧻", label: "toilet paper", aliases: ["toilet paper", "a roll of toilet paper"] },
-  { emoji: "🍎", label: "apple", aliases: ["an apple", "a red apple", "apple"] },
-  { emoji: "🍌", label: "banana", aliases: ["a banana", "banana"] },
-  { emoji: "🥤", label: "cup", aliases: ["a cup", "a drinking cup", "plastic cup"] },
-  { emoji: "🧴", label: "bottle", aliases: ["a bottle", "a plastic bottle", "water bottle"] },
-  { emoji: "📕", label: "book", aliases: ["a book", "a red book"] },
-  { emoji: "🥄", label: "spoon", aliases: ["a spoon", "a metal spoon"] },
-  { emoji: "🧸", label: "teddy bear", aliases: ["a teddy bear", "a stuffed bear", "stuffed animal"] },
-  { emoji: "📱", label: "cell phone", aliases: ["a cell phone", "a smartphone", "a phone"] },
-  { emoji: "🪥", label: "toothbrush", aliases: ["a toothbrush", "toothbrush"] },
-  { emoji: "🎧", label: "headphones", aliases: ["headphones", "a pair of headphones"] },
-  { emoji: "🕶️", label: "sunglasses", aliases: ["sunglasses", "a pair of sunglasses"] },
-  { emoji: "⚽", label: "soccer ball", aliases: ["a soccer ball", "soccer ball"] },
-  { emoji: "🏀", label: "basketball", aliases: ["a basketball", "basketball"] },
-  { emoji: "🎮", label: "game controller", aliases: ["a game controller", "controller"] },
-  { emoji: "⌚", label: "watch", aliases: ["a watch", "smartwatch"] },
-  { emoji: "✏️", label: "pencil", aliases: ["a pencil", "pencil"] },
-  { emoji: "🖊️", label: "pen", aliases: ["a pen", "pen"] },
-  { emoji: "🧢", label: "cap", aliases: ["a cap", "a baseball cap", "hat"] },
-  { emoji: "👟", label: "shoe", aliases: ["a shoe", "sneaker"] }
-];
+const knownUsers = new Map();
 
 const TOTAL_FACE_ROUNDS = 5;
 const TOTAL_HUNT_ROUNDS = 10;
+const HUNT_DURATION_MS = 60 * 1000;
 
-app.use(express.static(path.join(__dirname, "public")));
-app.get("/health", (_, res) => res.json({ ok: true, game: "EmojiTV" }));
+const EMOJIS = [
+  "😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇",
+  "🙂","🙃","😉","😌","😍","🥰","😘","😗","😙","😚",
+  "😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🤩",
+  "🥳","😏","😒","😞","😔","😟","😕","🙁","☹️","😣",
+  "😖","😫","😩","🥺","😢","😭","😤","😠","😡","🤬",
+  "🤯","😳","🥵","🥶","😱","😨","😰","😥","😓","🤗",
+  "🤔","🫣","🤭","🫢","🤫","🤥","😶","😐","😑","😬",
+  "🙄","😯","😦","😧","😮","😲","🥱","😴","🤤","😪",
+  "😵","🤐","🥴","🤢","🤮","🤧","😷","🤠","🤑","🤡",
+  "👻","💀","☠️","👽","🤖","🎃","😺","😸","😹","😻"
+];
 
-function send(ws, data) {
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify(data));
+/*
+  Hunt uses COCO-SSD in the browser.
+
+  These are intentionally objects that the model can recognize.
+  This prevents the old system from awarding random points.
+
+  Toilet paper is intentionally NOT in the automatic pool because
+  COCO-SSD cannot reliably recognize toilet paper.
+*/
+const HUNT_ITEMS = [
+  { emoji: "🍎", label: "apple", className: "apple" },
+  { emoji: "🍌", label: "banana", className: "banana" },
+  { emoji: "🍊", label: "orange", className: "orange" },
+  { emoji: "🥦", label: "broccoli", className: "broccoli" },
+  { emoji: "🥕", label: "carrot", className: "carrot" },
+  { emoji: "🥪", label: "sandwich", className: "sandwich" },
+  { emoji: "🍕", label: "pizza", className: "pizza" },
+  { emoji: "🍩", label: "donut", className: "donut" },
+  { emoji: "🎂", label: "cake", className: "cake" },
+  { emoji: "🥤", label: "cup", className: "cup" },
+  { emoji: "🧴", label: "bottle", className: "bottle" },
+  { emoji: "📕", label: "book", className: "book" },
+  { emoji: "🥄", label: "spoon", className: "spoon" },
+  { emoji: "🍴", label: "fork", className: "fork" },
+  { emoji: "🔪", label: "knife", className: "knife" },
+  { emoji: "🥣", label: "bowl", className: "bowl" },
+  { emoji: "🍷", label: "wine glass", className: "wine glass" },
+  { emoji: "🧸", label: "teddy bear", className: "teddy bear" },
+  { emoji: "📱", label: "cell phone", className: "cell phone" },
+  { emoji: "🪥", label: "toothbrush", className: "toothbrush" },
+  { emoji: "⚽", label: "sports ball", className: "sports ball" },
+  { emoji: "✂️", label: "scissors", className: "scissors" },
+  { emoji: "🏺", label: "vase", className: "vase" }
+];
+
+const SKIPPABLE_ITEM = "toilet paper";
+
+function safeSend(ws, data) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  try {
+    ws.send(JSON.stringify(data));
+  } catch {}
 }
 
-function broadcast(data) {
-  for (const ws of clients) send(ws, data);
+function getUsername(ws) {
+  return ws.username || "Guest";
 }
 
-function createId() {
-  return crypto.randomUUID();
+function getFriendSet(username) {
+  if (!friends.has(username)) {
+    friends.set(username, new Set());
+  }
+  return friends.get(username);
 }
 
-function cleanName(name) {
-  const value = String(name || "").trim().replace(/\s+/g, " ").slice(0, 20);
-  return value || "Guest";
-}
-
-function removeFromWaiting(ws) {
-  const i = waiting.indexOf(ws);
-  if (i !== -1) waiting.splice(i, 1);
-}
-
-function randomItem(list) {
-  return list[Math.floor(Math.random() * list.length)];
-}
-
-function modeRounds(mode) {
-  return mode === "hunt" ? TOTAL_HUNT_ROUNDS : TOTAL_FACE_ROUNDS;
-}
-
-function nextUnique(list, used) {
-  const available = list.filter(x => !used.has(typeof x === "string" ? x : x.emoji));
-  const pick = randomItem(available.length ? available : list);
-  used.add(typeof pick === "string" ? pick : pick.emoji);
-  return pick;
-}
-
-function nextHuntTarget(used) {
-  return { ...nextUnique(HUNT_ITEMS, used) };
-}
-
-function pairKey(a, b) {
-  return [a, b].sort().join("\u0000");
-}
-
-function ensureSet(map, key) {
-  if (!map.has(key)) map.set(key, new Set());
-  return map.get(key);
+function getRequestSet(username) {
+  if (!friendRequests.has(username)) {
+    friendRequests.set(username, new Set());
+  }
+  return friendRequests.get(username);
 }
 
 function isFriend(a, b) {
-  return ensureSet(friends, a).has(b);
+  return getFriendSet(a).has(b);
 }
 
-function friendPayload(username) {
-  const list = [...ensureSet(friends, username)];
-  const pending = [...ensureSet(friendRequests, username)];
-
-  return {
-    type: "friends",
-    friends: list.map(name => ({
-      username: name,
-      online: [...clients].some(c => c.username === name)
-    })),
-    pending
-  };
-}
-
-function sendFriends(username) {
-  for (const c of clients) {
-    if (c.username === username) send(c, friendPayload(username));
+function findClient(username) {
+  for (const ws of clients.values()) {
+    if (ws.username === username) return ws;
   }
+  return null;
 }
 
-function sendDmHistory(a, b) {
-  const h = dmHistory.get(pairKey(a, b)) || [];
-
-  for (const c of clients) {
-    if (c.username === a) {
-      send(c, {
-        type: "dm-history",
-        with: b,
-        messages: h.slice(-100)
-      });
-    }
-  }
+function isKnownUser(username) {
+  return knownUsers.has(username);
 }
 
-function addDm(a, b, text) {
-  const key = pairKey(a, b);
-  const h = dmHistory.get(key) || [];
-
-  h.push({
-    from: a,
-    to: b,
-    text,
-    createdAt: new Date().toISOString()
-  });
-
-  if (h.length > 200) h.shift();
-
-  dmHistory.set(key, h);
+function onlineUsernames() {
+  return [...clients.values()]
+    .map(ws => ws.username)
+    .filter(name => name && name !== "Guest");
 }
 
 function onlinePayload() {
-  const names = [...clients]
-    .map(ws => ws.username || "Guest")
-    .sort((a, b) => a.localeCompare(b));
-
   return {
     type: "online-list",
-    count: clients.size,
-    names
+    count: onlineUsernames().length,
+    players: onlineUsernames().map(username => ({
+      username,
+      online: true
+    }))
   };
+}
+
+function broadcast(data) {
+  for (const ws of clients.values()) {
+    safeSend(ws, data);
+  }
 }
 
 function broadcastOnline() {
   broadcast(onlinePayload());
-
-  for (const c of clients) {
-    sendFriends(c.username);
-  }
 }
 
-function ensureStats(mode, username) {
-  if (!leaderboard[mode].has(username)) {
-    leaderboard[mode].set(username, {
-      username,
-      wins: 0,
-      points: 0,
-      games: 0
-    });
-  }
+function friendPayload(username) {
+  const friendList = [...getFriendSet(username)].map(name => ({
+    username: name,
+    online: !!findClient(name)
+  }));
 
-  return leaderboard[mode].get(username);
-}
-
-function recordCompletedGame(room) {
-  if (!room || room.completed) return;
-
-  room.completed = true;
-
-  const players = [room.a, room.b];
-  const scores = room.scores;
-
-  const aScore = scores[room.a.playerId] || 0;
-  const bScore = scores[room.b.playerId] || 0;
-
-  for (const player of players) {
-    const stats = ensureStats(room.mode, player.username);
-
-    stats.games += 1;
-    stats.points += scores[player.playerId] || 0;
-  }
-
-  if (aScore > bScore) {
-    ensureStats(room.mode, room.a.username).wins += 1;
-  }
-
-  if (bScore > aScore) {
-    ensureStats(room.mode, room.b.username).wins += 1;
-  }
-
-  broadcastLeaderboards();
-}
-
-function leaderboardPayload(mode) {
-  const rows = [...leaderboard[mode].values()]
-    .sort(
-      (a, b) =>
-        b.wins - a.wins ||
-        b.points - a.points ||
-        a.username.localeCompare(b.username)
-    )
-    .slice(0, 20)
-    .map((x, i) => ({
-      rank: i + 1,
-      ...x
-    }));
+  const incoming = [...getRequestSet(username)];
 
   return {
-    mode,
-    rows
+    type: "friend-data",
+    friends: friendList,
+    incoming
   };
 }
 
-function broadcastLeaderboards() {
-  for (const mode of ["face", "hunt", "chat"]) {
-    broadcast(leaderboardPayload(mode));
+function sendFriends(ws) {
+  safeSend(ws, friendPayload(getUsername(ws)));
+}
+
+function sendFriendsTo(username) {
+  const ws = findClient(username);
+  if (ws) sendFriends(ws);
+}
+
+function addFriend(a, b) {
+  getFriendSet(a).add(b);
+  getFriendSet(b).add(a);
+
+  getRequestSet(a).delete(b);
+  getRequestSet(b).delete(a);
+
+  sendFriendsTo(a);
+  sendFriendsTo(b);
+}
+
+function leaderboardRows(board) {
+  return [...board.entries()]
+    .sort((a, b) => b[1].wins - a[1].wins || b[1].score - a[1].score)
+    .slice(0, 20)
+    .map(([username, data]) => ({
+      username,
+      wins: data.wins,
+      losses: data.losses,
+      score: data.score
+    }));
+}
+
+function leaderboardPayload() {
+  return {
+    type: "leaderboards",
+    face: leaderboardRows(leaderboards.face),
+    hunt: leaderboardRows(leaderboards.hunt),
+    chat: leaderboardRows(leaderboards.chat)
+  };
+}
+
+function ensureLeaderboard(mode, username) {
+  if (!leaderboards[mode].has(username)) {
+    leaderboards[mode].set(username, {
+      wins: 0,
+      losses: 0,
+      score: 0
+    });
+  }
+
+  return leaderboards[mode].get(username);
+}
+
+function recordCompletedGame(room) {
+  if (room.completed) return;
+  room.completed = true;
+
+  const players = [room.a, room.b];
+
+  if (room.mode === "chat") {
+    for (const ws of players) {
+      const row = ensureLeaderboard("chat", ws.username);
+      row.score += 1;
+    }
+    return;
+  }
+
+  const aScore = room.scores[room.a.id] || 0;
+  const bScore = room.scores[room.b.id] || 0;
+
+  const aRow = ensureLeaderboard(room.mode, room.a.username);
+  const bRow = ensureLeaderboard(room.mode, room.b.username);
+
+  aRow.score += aScore;
+  bRow.score += bScore;
+
+  if (aScore > bScore) {
+    aRow.wins++;
+    bRow.losses++;
+  } else if (bScore > aScore) {
+    bRow.wins++;
+    aRow.losses++;
   }
 }
 
-function endRoom(ws, notifyOpponent = true) {
-  removeFromWaiting(ws);
+function clearHuntTimer(room) {
+  if (room && room.huntTimer) {
+    clearTimeout(room.huntTimer);
+    room.huntTimer = null;
+  }
+}
 
-  if (!ws.roomId) return null;
+function nextUnique(list, used, keyFn) {
+  const available = list.filter(item => !used.has(keyFn(item)));
 
-  const roomId = ws.roomId;
-  const room = rooms.get(roomId);
-
-  if (!room) {
-    ws.roomId = null;
+  if (!available.length) {
     return null;
   }
 
-  const opponent = room.a === ws ? room.b : room.a;
-
-  if (room.mode === "chat" && !room.completed) {
-    room.completed = true;
-
-    ensureStats("chat", room.a.username).games += 1;
-    ensureStats("chat", room.b.username).games += 1;
-
-    ensureStats("chat", room.a.username).points += 1;
-    ensureStats("chat", room.b.username).points += 1;
-
-    broadcastLeaderboards();
-  }
-
-  if (opponent && notifyOpponent) {
-    send(opponent, { type: "opponent-left" });
-  }
-
-  if (room.a) room.a.roomId = null;
-  if (room.b) room.b.roomId = null;
-
-  rooms.delete(roomId);
-
-  return opponent;
+  const item = available[Math.floor(Math.random() * available.length)];
+  used.add(keyFn(item));
+  return item;
 }
 
-function putInQueue(ws, mode) {
-  removeFromWaiting(ws);
-
-  if (ws.readyState !== 1) return;
-
-  ws.queueMode = mode;
-  waiting.push(ws);
-
-  send(ws, {
-    type: "waiting",
-    mode
-  });
+function nextFaceTarget(room) {
+  return nextUnique(
+    EMOJIS,
+    room.usedTargets,
+    emoji => emoji
+  );
 }
 
-function findWaitingOpponent(mode) {
-  for (let i = 0; i < waiting.length; i++) {
-    const candidate = waiting[i];
+function nextHuntTarget(room) {
+  return nextUnique(
+    HUNT_ITEMS,
+    room.usedTargets,
+    item => item.label
+  );
+}
 
-    if (
-      candidate.readyState === 1 &&
-      candidate.queueMode === mode
-    ) {
-      waiting.splice(i, 1);
-      candidate.queueMode = null;
-      return candidate;
+function clearRoomTimers(room) {
+  if (!room) return;
+
+  clearHuntTimer(room);
+
+  if (room.nextRoundTimer) {
+    clearTimeout(room.nextRoundTimer);
+    room.nextRoundTimer = null;
+  }
+}
+
+function sendRoundStart(room, skipped = false) {
+  if (!room || room.completed) return;
+
+  if (room.mode === "face") {
+    room.target = nextFaceTarget(room);
+
+    safeSend(room.a, {
+      type: "new-round",
+      mode: "face",
+      round: room.round,
+      totalRounds: room.totalRounds,
+      target: room.target,
+      skipped
+    });
+
+    safeSend(room.b, {
+      type: "new-round",
+      mode: "face",
+      round: room.round,
+      totalRounds: room.totalRounds,
+      target: room.target,
+      skipped
+    });
+
+    return;
+  }
+
+  if (room.mode === "hunt") {
+    room.target = nextHuntTarget(room);
+
+    if (!room.target) {
+      finishGame(room);
+      return;
     }
-  }
 
-  return null;
+    room.huntFound = false;
+    room.skipReady.clear();
+
+    safeSend(room.a, {
+      type: "new-round",
+      mode: "hunt",
+      round: room.round,
+      totalRounds: room.totalRounds,
+      target: room.target,
+      skipped
+    });
+
+    safeSend(room.b, {
+      type: "new-round",
+      mode: "hunt",
+      round: room.round,
+      totalRounds: room.totalRounds,
+      target: room.target,
+      skipped
+    });
+
+    startHuntTimer(room);
+  }
 }
 
-function startMatch(playerA, playerB, mode) {
-  const roomId = createId();
+function sendNextRound(room) {
+  if (!room || room.completed) return;
 
-  const target =
-    mode === "hunt"
-      ? nextHuntTarget(new Set())
-      : mode === "face"
-      ? nextUnique(EMOJIS, new Set())
-      : null;
+  clearHuntTimer(room);
 
-  const rounds = modeRounds(mode);
+  if (room.round >= room.totalRounds) {
+    finishGame(room);
+    return;
+  }
+
+  room.round++;
+  room.roundScores = {};
+  room.nextReady.clear();
+  room.skipReady.clear();
+  room.huntFound = false;
+
+  sendRoundStart(room);
+}
+
+function finishGame(room) {
+  if (!room || room.completed) return;
+
+  clearRoomTimers(room);
+
+  recordCompletedGame(room);
+
+  const aScore = room.scores[room.a.id] || 0;
+  const bScore = room.scores[room.b.id] || 0;
+
+  let winnerUsername = null;
+
+  if (aScore > bScore) winnerUsername = room.a.username;
+  if (bScore > aScore) winnerUsername = room.b.username;
+
+  const payload = {
+    type: "game-over",
+    mode: room.mode,
+    totalRounds: room.totalRounds,
+    finalScores: {
+      [room.a.username]: aScore,
+      [room.b.username]: bScore
+    },
+    winnerUsername
+  };
+
+  safeSend(room.a, payload);
+  safeSend(room.b, payload);
+}
+
+function startHuntTimer(room) {
+  clearHuntTimer(room);
+
+  room.huntTimer = setTimeout(() => {
+    if (!rooms.has(room.id) || room.completed || room.huntFound) {
+      return;
+    }
+
+    room.huntFound = true;
+
+    safeSend(room.a, {
+      type: "hunt-timeout",
+      round: room.round,
+      target: room.target
+    });
+
+    safeSend(room.b, {
+      type: "hunt-timeout",
+      round: room.round,
+      target: room.target
+    });
+
+    room.nextRoundTimer = setTimeout(() => {
+      room.nextRoundTimer = null;
+
+      if (rooms.has(room.id) && !room.completed) {
+        sendNextRound(room);
+      }
+    }, 1500);
+  }, HUNT_DURATION_MS);
+}
+
+function startMatch(a, b, mode) {
+  const roomId =
+    Date.now().toString(36) +
+    "-" +
+    Math.random().toString(36).slice(2, 8);
+
+  const totalRounds =
+    mode === "face"
+      ? TOTAL_FACE_ROUNDS
+      : mode === "hunt"
+      ? TOTAL_HUNT_ROUNDS
+      : 1;
 
   const room = {
     id: roomId,
-    a: playerA,
-    b: playerB,
+    a,
+    b,
     mode,
     round: 1,
-    totalRounds: rounds,
-    target,
-    usedTargets: new Set([target]),
+    totalRounds,
+    usedTargets: new Set(),
+    target: null,
     scores: {
-      [playerA.playerId]: 0,
-      [playerB.playerId]: 0
+      [a.id]: 0,
+      [b.id]: 0
     },
     roundScores: {},
     nextReady: new Set(),
     rematchReady: new Set(),
     skipReady: new Set(),
     huntFound: false,
+    huntTimer: null,
+    nextRoundTimer: null,
     completed: false
   };
 
   rooms.set(roomId, room);
 
-  playerA.roomId = roomId;
-  playerB.roomId = roomId;
+  a.roomId = roomId;
+  b.roomId = roomId;
 
-  playerA.role = "a";
-  playerB.role = "b";
+  waiting.delete(a);
+  waiting.delete(b);
+
+  if (mode === "face") {
+    room.target = nextFaceTarget(room);
+  }
+
+  if (mode === "hunt") {
+    room.target = nextHuntTarget(room);
+  }
 
   const base = {
     type: "matched",
     roomId,
-    round: 1,
-    totalRounds: rounds,
     mode,
-    target
+    round: 1,
+    totalRounds,
+    target: room.target,
+    opponentId: null,
+    opponentUsername: null
   };
 
-  send(playerA, {
+  safeSend(a, {
     ...base,
+    initiator: true,
     role: "a",
-    opponentId: playerB.playerId,
-    opponentUsername: playerB.username
+    opponentId: b.id,
+    opponentUsername: b.username
   });
 
-  send(playerB, {
+  safeSend(b, {
     ...base,
+    initiator: false,
     role: "b",
-    opponentId: playerA.playerId,
-    opponentUsername: playerA.username
+    opponentId: a.id,
+    opponentUsername: a.username
   });
+
+  if (mode === "hunt") {
+    startHuntTimer(room);
+  }
 }
 
-function sendNextRound(room) {
-  if (room.round >= room.totalRounds) {
-    recordCompletedGame(room);
-
-    send(room.a, {
-      type: "game-over",
-      mode: room.mode,
-      finalScores: room.scores
+function tryMatch(ws, mode) {
+  if (!ws.username || ws.username === "Guest") {
+    safeSend(ws, {
+      type: "error",
+      message: "Please enter a username first."
     });
-
-    send(room.b, {
-      type: "game-over",
-      mode: room.mode,
-      finalScores: room.scores
-    });
-
     return;
   }
 
-  room.round += 1;
-  room.nextReady.clear();
-  room.huntFound = false;
-  room.roundScores = {};
+  if (ws.roomId) {
+    safeSend(ws, {
+      type: "error",
+      message: "You are already in a game."
+    });
+    return;
+  }
 
-  room.target =
-    room.mode === "hunt"
-      ? nextHuntTarget(room.usedTargets)
-      : room.mode === "face"
-      ? nextUnique(EMOJIS, room.usedTargets)
-      : null;
+  const old = waiting.get(ws);
 
-  const message = {
-    type: "new-round",
-    round: room.round,
-    totalRounds: room.totalRounds,
-    mode: room.mode,
-    target: room.target
-  };
+  if (old) {
+    waiting.delete(ws);
+  }
 
-  send(room.a, message);
-  send(room.b, message);
+  let opponent = null;
+
+  for (const [candidate, candidateMode] of waiting.entries()) {
+    if (
+      candidate !== ws &&
+      candidateMode === mode &&
+      candidate.readyState === WebSocket.OPEN &&
+      !candidate.roomId
+    ) {
+      opponent = candidate;
+      break;
+    }
+  }
+
+  if (opponent) {
+    waiting.delete(opponent);
+    startMatch(opponent, ws, mode);
+  } else {
+    waiting.set(ws, mode);
+
+    safeSend(ws, {
+      type: "waiting",
+      mode
+    });
+  }
+}
+
+function removeFromWaiting(ws) {
+  waiting.delete(ws);
+}
+
+function getRoom(ws) {
+  if (!ws.roomId) return null;
+  return rooms.get(ws.roomId) || null;
+}
+
+function otherPlayer(room, ws) {
+  if (!room) return null;
+  return room.a === ws ? room.b : room.a;
+}
+
+function endRoom(ws, notifyOpponent = true) {
+  const room = getRoom(ws);
+
+  removeFromWaiting(ws);
+
+  if (!room) {
+    ws.roomId = null;
+    return;
+  }
+
+  clearRoomTimers(room);
+
+  const opponent = otherPlayer(room, ws);
+
+  rooms.delete(room.id);
+
+  room.a.roomId = null;
+  room.b.roomId = null;
+
+  if (notifyOpponent && opponent) {
+    safeSend(opponent, {
+      type: "opponent-left",
+      username: ws.username
+    });
+  }
+
+  safeSend(ws, {
+    type: "left-room"
+  });
+}
+
+function setUsername(ws, requested) {
+  let username = String(requested || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 20);
+
+  if (!username) {
+    safeSend(ws, {
+      type: "username-error",
+      message: "Please enter a username."
+    });
+    return;
+  }
+
+  if (!/^[a-zA-Z0-9 _-]+$/.test(username)) {
+    safeSend(ws, {
+      type: "username-error",
+      message: "Use only letters, numbers, spaces, - or _."
+    });
+    return;
+  }
+
+  for (const other of clients.values()) {
+    if (other !== ws && other.username === username) {
+      safeSend(ws, {
+        type: "username-error",
+        message: "That username is already online."
+      });
+      return;
+    }
+  }
+
+  const oldName = ws.username;
+
+  ws.username = username;
+  knownUsers.set(username, Date.now());
+
+  if (oldName && oldName !== "Guest" && oldName !== username) {
+    if (friends.has(oldName)) {
+      const oldFriends = friends.get(oldName);
+      friends.set(username, new Set(oldFriends));
+
+      for (const friend of oldFriends) {
+        getFriendSet(friend).delete(oldName);
+        getFriendSet(friend).add(username);
+      }
+
+      friends.delete(oldName);
+    }
+
+    if (friendRequests.has(oldName)) {
+      friendRequests.set(username, new Set(friendRequests.get(oldName)));
+      friendRequests.delete(oldName);
+    }
+  }
+
+  safeSend(ws, {
+    type: "username-saved",
+    username
+  });
+
+  sendFriends(ws);
+  broadcastOnline();
+}
+
+function sendSearchResults(ws, query) {
+  const q = String(query || "")
+    .trim()
+    .toLowerCase()
+    .slice(0, 20);
+
+  if (!q) {
+    safeSend(ws, {
+      type: "user-search-results",
+      results: []
+    });
+    return;
+  }
+
+  const results = [];
+
+  for (const username of knownUsers.keys()) {
+    if (username === ws.username) continue;
+
+    if (!username.toLowerCase().includes(q)) continue;
+
+    const incoming = getRequestSet(username).has(ws.username);
+
+    let outgoing = false;
+
+    for (const requester of friendRequests.get(username) || []) {
+      if (requester === ws.username) {
+        outgoing = true;
+      }
+    }
+
+    results.push({
+      username,
+      online: !!findClient(username),
+      friend: isFriend(ws.username, username),
+      outgoing: getRequestSet(username).has(ws.username),
+      incoming: getRequestSet(ws.username).has(username)
+    });
+
+    if (results.length >= 20) break;
+  }
+
+  safeSend(ws, {
+    type: "user-search-results",
+    results
+  });
+}
+
+function sendDMHistory(ws, withUsername) {
+  const key = [ws.username, withUsername].sort().join("|");
+
+  safeSend(ws, {
+    type: "dm-history",
+    with: withUsername,
+    messages: dmHistory.get(key) || []
+  });
+}
+
+function saveDM(a, b, text) {
+  const key = [a, b].sort().join("|");
+
+  if (!dmHistory.has(key)) {
+    dmHistory.set(key, []);
+  }
+
+  const messages = dmHistory.get(key);
+
+  messages.push({
+    from: a,
+    to: b,
+    text,
+    timestamp: Date.now()
+  });
+
+  if (messages.length > 100) {
+    messages.shift();
+  }
 }
 
 wss.on("connection", ws => {
-  clients.add(ws);
+  ws.id =
+    Math.random().toString(36).slice(2) +
+    Date.now().toString(36);
 
-  ws.playerId = createId();
-  ws.roomId = null;
-  ws.role = null;
-  ws.queueMode = null;
   ws.username = "Guest";
+  ws.roomId = null;
 
-  send(ws, {
-    type: "ready",
-    playerId: ws.playerId,
-    username: ws.username
+  clients.set(ws.id, ws);
+
+  safeSend(ws, {
+    type: "ready"
   });
 
-  send(ws, onlinePayload());
-  broadcastOnline();
+  safeSend(ws, onlinePayload());
+  safeSend(ws, leaderboardPayload());
 
   ws.on("message", raw => {
-    let message;
+    let data;
 
     try {
-      message = JSON.parse(raw.toString());
+      data = JSON.parse(raw.toString());
     } catch {
-      return;
-    }
-
-    if (message.type === "set-username") {
-      const oldName = ws.username;
-
-      ws.username = cleanName(message.username);
-
-      send(ws, {
-        type: "username-saved",
-        username: ws.username
+      safeSend(ws, {
+        type: "error",
+        message: "Invalid message."
       });
-
-      if (oldName !== ws.username) {
-        broadcastOnline();
-        sendFriends(oldName);
-        sendFriends(ws.username);
-      }
-
       return;
     }
 
-    if (message.type === "get-friends") {
-      send(ws, friendPayload(ws.username));
+    const type = data.type;
+
+    if (type === "identify" || type === "set-username") {
+      setUsername(ws, data.username);
       return;
     }
 
-    if (message.type === "friend-request") {
-      const to = cleanName(message.to);
+    if (type === "get-friends") {
+      sendFriends(ws);
+      return;
+    }
 
-      if (!to || to === ws.username) return;
+    if (type === "search-users") {
+      sendSearchResults(ws, data.query);
+      return;
+    }
 
-      const target = [...clients].find(
-        c => c.username === to
-      );
+    if (type === "friend-request") {
+      const from = ws.username;
+      const to = String(data.username || "").trim();
 
-      if (!target) {
-        send(ws, {
+      if (!to || to === from) {
+        safeSend(ws, {
           type: "friend-result",
           ok: false,
-          error: "That player is not online."
+          message: "You cannot friend yourself."
         });
-
         return;
       }
 
-      if (isFriend(ws.username, to)) {
-        send(ws, {
+      if (!isKnownUser(to)) {
+        safeSend(ws, {
           type: "friend-result",
           ok: false,
-          error: "You are already friends."
+          message: "That username has not been seen on EmojiTV yet."
         });
-
         return;
       }
 
-      ensureSet(friendRequests, to).add(ws.username);
+      if (isFriend(from, to)) {
+        safeSend(ws, {
+          type: "friend-result",
+          ok: false,
+          message: "You are already friends."
+        });
+        return;
+      }
 
-      send(target, {
-        type: "friend-request-received",
-        from: ws.username
-      });
+      if (getRequestSet(to).has(from)) {
+        safeSend(ws, {
+          type: "friend-result",
+          ok: false,
+          message: "Friend request already sent."
+        });
+        return;
+      }
 
-      send(ws, {
+      getRequestSet(to).add(from);
+
+      safeSend(ws, {
         type: "friend-result",
         ok: true,
-        message: `Friend request sent to ${to}.`
+        message: "Friend request sent."
       });
 
-      sendFriends(to);
-      sendFriends(ws.username);
+      const target = findClient(to);
+
+      if (target) {
+        safeSend(target, {
+          type: "friend-request-received",
+          from
+        });
+
+        sendFriends(target);
+      }
 
       return;
     }
 
-    if (message.type === "friend-accept") {
-      const from = cleanName(message.from);
+    if (type === "friend-accept") {
+      const from = String(data.from || "").trim();
+      const to = ws.username;
 
-      ensureSet(friendRequests, ws.username).delete(from);
+      if (!from || !getRequestSet(to).has(from)) {
+        safeSend(ws, {
+          type: "friend-result",
+          ok: false,
+          message: "That friend request is no longer available."
+        });
+        return;
+      }
 
-      ensureSet(friends, ws.username).add(from);
-      ensureSet(friends, from).add(ws.username);
+      addFriend(to, from);
 
-      send(ws, {
+      safeSend(ws, {
         type: "friend-result",
         ok: true,
-        message: `You are now friends with ${from}.`
+        message: "Friend request accepted."
       });
 
-      sendFriends(ws.username);
-      sendFriends(from);
+      const requester = findClient(from);
+
+      if (requester) {
+        safeSend(requester, {
+          type: "friend-request-accepted",
+          username: to
+        });
+      }
 
       return;
     }
 
-    if (message.type === "friend-invite") {
-      const to = cleanName(message.to);
+    if (type === "friend-decline") {
+      const from = String(data.from || "").trim();
 
-      const mode = ["face", "chat", "hunt"].includes(message.mode)
-        ? message.mode
-        : "face";
+      getRequestSet(ws.username).delete(from);
 
-      if (!to || to === ws.username) return;
+      sendFriends(ws);
+
+      return;
+    }
+
+    if (type === "dm") {
+      const to = String(data.to || "").trim();
+      const text = String(data.text || "").trim().slice(0, 500);
+
+      if (!to || !text) return;
 
       if (!isFriend(ws.username, to)) {
-        send(ws, {
-          type: "invite-result",
-          ok: false,
-          error: "You can only invite friends."
+        safeSend(ws, {
+          type: "error",
+          message: "You can only message friends."
         });
-
         return;
       }
 
-      const target = [...clients].find(
-        c => c.username === to
-      );
+      saveDM(ws.username, to, text);
+
+      safeSend(ws, {
+        type: "dm",
+        from: ws.username,
+        to,
+        text,
+        timestamp: Date.now()
+      });
+
+      const target = findClient(to);
+
+      if (target) {
+        safeSend(target, {
+          type: "dm",
+          from: ws.username,
+          to,
+          text,
+          timestamp: Date.now()
+        });
+      }
+
+      return;
+    }
+
+    if (type === "get-dm-history") {
+      const withUsername = String(data.with || "").trim();
+
+      if (withUsername) {
+        sendDMHistory(ws, withUsername);
+      }
+
+      return;
+    }
+
+    if (type === "friend-invite") {
+      const to = String(data.to || "").trim();
+      const mode = ["face", "hunt", "chat"].includes(data.mode)
+        ? data.mode
+        : "face";
+
+      if (!isFriend(ws.username, to)) {
+        safeSend(ws, {
+          type: "invite-result",
+          ok: false,
+          message: "You can only invite friends."
+        });
+        return;
+      }
+
+      const target = findClient(to);
 
       if (!target) {
-        send(ws, {
+        safeSend(ws, {
           type: "invite-result",
           ok: false,
-          error: "That friend is offline."
+          message: "That friend is offline."
         });
-
         return;
       }
 
-      if (ws.roomId || ws.queueMode) {
-        send(ws, {
-          type: "invite-result",
-          ok: false,
-          error: "Leave your current match before sending an invite."
-        });
-
-        return;
-      }
-
-      if (target.roomId || target.queueMode) {
-        send(ws, {
-          type: "invite-result",
-          ok: false,
-          error: "That friend is already busy."
-        });
-
-        return;
-      }
-
-      const inviteId = createId();
+      const inviteId =
+        Math.random().toString(36).slice(2) +
+        Date.now().toString(36);
 
       pendingInvites.set(inviteId, {
         from: ws.username,
         to,
         mode,
-        createdAt: Date.now()
+        timestamp: Date.now()
       });
 
-      send(target, {
+      safeSend(target, {
         type: "game-invite",
         inviteId,
         from: ws.username,
         mode
       });
 
-      send(ws, {
+      safeSend(ws, {
         type: "invite-result",
         ok: true,
-        message: `Invite sent to ${to}.`
+        message: "Game invite sent."
       });
 
       return;
     }
 
-    if (message.type === "decline-invite") {
-      const id = String(message.inviteId || "");
-      const invite = pendingInvites.get(id);
+    if (type === "decline-invite") {
+      const inviteId = String(data.inviteId || "");
+      pendingInvites.delete(inviteId);
+      return;
+    }
 
-      if (!invite || invite.to !== ws.username) return;
+    if (type === "accept-invite") {
+      const inviteId = String(data.inviteId || "");
+      const invite = pendingInvites.get(inviteId);
 
-      pendingInvites.delete(id);
-
-      const sender = [...clients].find(
-        c => c.username === invite.from
-      );
-
-      if (sender) {
-        send(sender, {
-          type: "invite-declined",
-          from: ws.username
+      if (!invite) {
+        safeSend(ws, {
+          type: "error",
+          message: "That invite expired."
         });
+        return;
       }
+
+      if (invite.to !== ws.username) {
+        return;
+      }
+
+      pendingInvites.delete(inviteId);
+
+      const inviter = findClient(invite.from);
+
+      if (!inviter) {
+        safeSend(ws, {
+          type: "error",
+          message: "The other player is no longer online."
+        });
+        return;
+      }
+
+      if (inviter.roomId || ws.roomId) {
+        safeSend(ws, {
+          type: "error",
+          message: "One of you is already in a game."
+        });
+        return;
+      }
+
+      startMatch(inviter, ws, invite.mode);
+      return;
+    }
+
+    if (type === "get-leaderboards") {
+      safeSend(ws, leaderboardPayload());
+      return;
+    }
+
+    if (type === "report") {
+      const target = String(data.username || "").trim();
+      const reason = String(data.reason || "other").slice(0, 50);
+      const details = String(data.details || "").slice(0, 500);
+
+      console.log("REPORT:", {
+        from: ws.username,
+        target,
+        reason,
+        details,
+        timestamp: Date.now()
+      });
+
+      safeSend(ws, {
+        type: "report-result",
+        ok: true,
+        message: "Report submitted."
+      });
 
       return;
     }
 
-    if (message.type === "accept-invite") {
-      const id = String(message.inviteId || "");
-      const invite = pendingInvites.get(id);
+    if (type === "find-match") {
+      const mode = ["face", "hunt", "chat"].includes(data.mode)
+        ? data.mode
+        : "face";
 
-      if (!invite || invite.to !== ws.username) {
-        send(ws, {
-          type: "invite-result",
-          ok: false,
-          error: "That invite is no longer available."
-        });
-
-        return;
-      }
-
-      if (ws.roomId || ws.queueMode) {
-        send(ws, {
-          type: "invite-result",
-          ok: false,
-          error: "You are already in a game."
-        });
-
-        return;
-      }
-
-      const sender = [...clients].find(
-        c => c.username === invite.from
-      );
-
-      if (
-        !sender ||
-        sender.roomId ||
-        sender.queueMode
-      ) {
-        pendingInvites.delete(id);
-
-        send(ws, {
-          type: "invite-result",
-          ok: false,
-          error: "Your friend is no longer available."
-        });
-
-        return;
-      }
-
-      pendingInvites.delete(id);
-
-      startMatch(sender, ws, invite.mode);
-      broadcastOnline();
-
+      tryMatch(ws, mode);
       return;
     }
 
-    if (message.type === "dm") {
-      const to = cleanName(message.to);
-      const text = String(message.text || "")
-        .trim()
-        .slice(0, 300);
+    if (type === "leave") {
+      endRoom(ws, true);
+      return;
+    }
 
-      if (!text || !isFriend(ws.username, to)) return;
+    if (type === "rematch-ready") {
+      const room = getRoom(ws);
 
-      addDm(ws.username, to, text);
+      if (!room) return;
 
-      for (const c of clients) {
-        if (c.username === to) {
-          send(c, {
-            type: "dm",
-            from: ws.username,
-            text,
-            createdAt: new Date().toISOString()
-          });
+      room.rematchReady.add(ws.id);
+
+      if (room.rematchReady.size === 2) {
+        clearRoomTimers(room);
+
+        room.round = 1;
+        room.usedTargets = new Set();
+        room.scores = {
+          [room.a.id]: 0,
+          [room.b.id]: 0
+        };
+        room.roundScores = {};
+        room.nextReady.clear();
+        room.skipReady.clear();
+        room.huntFound = false;
+        room.completed = false;
+
+        if (room.mode === "face") {
+          room.target = nextFaceTarget(room);
+        } else if (room.mode === "hunt") {
+          room.target = nextHuntTarget(room);
+        } else {
+          room.target = null;
+        }
+
+        safeSend(room.a, {
+          type: "rematch-started",
+          mode: room.mode,
+          round: 1,
+          totalRounds: room.totalRounds,
+          target: room.target,
+          opponentUsername: room.b.username
+        });
+
+        safeSend(room.b, {
+          type: "rematch-started",
+          mode: room.mode,
+          round: 1,
+          totalRounds: room.totalRounds,
+          target: room.target,
+          opponentUsername: room.a.username
+        });
+
+        room.rematchReady.clear();
+
+        if (room.mode === "hunt") {
+          startHuntTimer(room);
         }
       }
 
-      send(ws, {
-        type: "dm",
-        from: ws.username,
-        text,
-        createdAt: new Date().toISOString()
-      });
-
-      sendDmHistory(ws.username, to);
-      sendDmHistory(to, ws.username);
-
       return;
     }
 
-    if (message.type === "get-dm-history") {
-      const to = cleanName(message.to);
+    if (type === "skip-item") {
+      const room = getRoom(ws);
 
-      if (isFriend(ws.username, to)) {
-        sendDmHistory(ws.username, to);
-      }
+      if (!room || room.mode !== "hunt") return;
 
-      return;
-    }
-
-    if (message.type === "get-leaderboards") {
-      for (const mode of ["face", "hunt", "chat"]) {
-        send(ws, leaderboardPayload(mode));
-      }
-
-      return;
-    }
-
-    if (message.type === "report") {
-      const allowedModes = ["face", "chat", "hunt"];
-
-      const reasons = [
-        "harassment",
-        "sexual-content",
-        "hate",
-        "threats",
-        "spam",
-        "privacy",
-        "other"
-      ];
-
-      const room = ws.roomId
-        ? rooms.get(ws.roomId)
-        : null;
-
-      const mode = allowedModes.includes(message.mode)
-        ? message.mode
-        : room?.mode;
-
-      if (!mode || !room) {
-        send(ws, {
-          type: "report-result",
-          ok: false,
-          error: "You can only report someone while connected to a game."
+      if (!room.target || room.target.label !== SKIPPABLE_ITEM) {
+        safeSend(ws, {
+          type: "error",
+          message: "Only toilet paper can be skipped."
         });
-
         return;
       }
 
-      const opponent =
-        room.a === ws
-          ? room.b
-          : room.a;
+      room.skipReady.add(ws.id);
 
-      if (!opponent) return;
+      const readyCount = room.skipReady.size;
 
-      const reason = reasons.includes(message.reason)
-        ? message.reason
-        : "other";
-
-      const details = String(message.details || "")
-        .trim()
-        .slice(0, 1000);
-
-      const report = {
-        id: createId(),
-        createdAt: new Date().toISOString(),
-        mode,
-        reporterId: ws.playerId,
-        reporterUsername: ws.username,
-        reportedId: opponent.playerId,
-        reportedUsername: opponent.username,
-        roomId: room.id,
-        reason,
-        details
-      };
-
-      reports.push(report);
-
-      if (reports.length > MAX_REPORTS) {
-        reports.shift();
-      }
-
-      console.log(
-        "EmojiTV REPORT",
-        JSON.stringify(report)
-      );
-
-      send(ws, {
-        type: "report-result",
-        ok: true,
-        reportId: report.id
+      safeSend(room.a, {
+        type: "skip-item-status",
+        ready: readyCount,
+        required: 2
       });
 
-      return;
-    }
-
-    if (message.type === "find-match") {
-      const mode = ["face", "chat", "hunt"].includes(message.mode)
-        ? message.mode
-        : "face";
-
-      if (message.username) {
-        ws.username = cleanName(message.username);
-      }
-
-      removeFromWaiting(ws);
-
-      const opponent = findWaitingOpponent(mode);
-
-      if (opponent) {
-        startMatch(opponent, ws, mode);
-      } else {
-        putInQueue(ws, mode);
-      }
-
-      broadcastOnline();
-
-      return;
-    }
-
-    if (message.type === "skip") {
-      const oldMode = ws.roomId
-        ? rooms.get(ws.roomId)?.mode
-        : ws.queueMode;
-
-      endRoom(ws, true);
-
-      if (oldMode) {
-        putInQueue(ws, oldMode);
-      }
-
-      broadcastOnline();
-
-      return;
-    }
-
-    if (message.type === "leave") {
-      endRoom(ws, true);
-      broadcastOnline();
-      return;
-    }
-
-    if (!ws.roomId) return;
-
-    const room = rooms.get(ws.roomId);
-
-    if (!room) return;
-
-    const opponent =
-      room.a === ws
-        ? room.b
-        : room.a;
-
-    if (message.type === "rematch-ready") {
-      room.rematchReady.add(ws.playerId);
-
-      send(room.a, {
-        type: "rematch-status",
-        ready: room.rematchReady.size
+      safeSend(room.b, {
+        type: "skip-item-status",
+        ready: readyCount,
+        required: 2
       });
 
-      send(room.b, {
-        type: "rematch-status",
-        ready: room.rematchReady.size
-      });
-
-      if (room.rematchReady.size === 2) {
-        room.rematchReady.clear();
-        room.completed = false;
-        room.round = 1;
-
-        room.scores = {
-          [room.a.playerId]: 0,
-          [room.b.playerId]: 0
-        };
-
-        room.roundScores = {};
-        room.nextReady = new Set();
+      if (readyCount === 2) {
+        clearHuntTimer(room);
         room.huntFound = false;
-        room.usedTargets = new Set();
 
-        room.target =
-          room.mode === "hunt"
-            ? nextHuntTarget(room.usedTargets)
-            : room.mode === "face"
-            ? nextUnique(EMOJIS, room.usedTargets)
-            : null;
+        // Mark the skipped target as used so it cannot repeat.
+        room.usedTargets.add(room.target.label);
 
-        send(room.a, {
-          type: "rematch-started",
-          round: 1,
-          totalRounds: room.totalRounds,
-          mode: room.mode,
-          target: room.target
-        });
+        room.target = nextHuntTarget(room);
 
-        send(room.b, {
-          type: "rematch-started",
-          round: 1,
-          totalRounds: room.totalRounds,
-          mode: room.mode,
-          target: room.target
-        });
-      }
+        if (!room.target) {
+          finishGame(room);
+          return;
+        }
 
-      return;
-    }
-
-    if (
-      message.type === "skip-item" &&
-      room.mode === "hunt"
-    ) {
-      if (room.target?.emoji !== "🧻") {
-        send(ws, {
-          type: "skip-item-result",
-          ok: false,
-          error: "Skip Item is only available for the toilet paper item."
-        });
-
-        return;
-      }
-
-      room.skipReady.add(ws.playerId);
-
-      send(room.a, {
-        type: "skip-item-status",
-        ready: room.skipReady.size
-      });
-
-      send(room.b, {
-        type: "skip-item-status",
-        ready: room.skipReady.size
-      });
-
-      if (room.skipReady.size === 2) {
         room.skipReady.clear();
-        room.huntFound = false;
-        room.roundScores = {};
-        room.target = nextHuntTarget(room.usedTargets);
 
-        send(room.a, {
+        safeSend(room.a, {
           type: "new-round",
+          mode: "hunt",
           round: room.round,
           totalRounds: room.totalRounds,
-          mode: "hunt",
           target: room.target,
           skipped: true
         });
 
-        send(room.b, {
+        safeSend(room.b, {
           type: "new-round",
+          mode: "hunt",
           round: room.round,
           totalRounds: room.totalRounds,
-          mode: "hunt",
           target: room.target,
           skipped: true
         });
+
+        startHuntTimer(room);
       }
 
       return;
     }
 
-    if (
-      message.type === "round-score" &&
-      room.mode === "face"
-    ) {
-      const score = Math.max(
-        0,
-        Math.min(
-          100,
-          Number(message.score) || 0
-        )
-      );
+    if (type === "round-score") {
+      const room = getRoom(ws);
 
-      room.roundScores[ws.playerId] = score;
+      if (!room || room.mode !== "face") return;
+      if (room.completed) return;
 
-      room.scores[ws.playerId] =
-        (room.scores[ws.playerId] || 0) +
-        score;
+      if (room.roundScores[ws.id] !== undefined) {
+        return;
+      }
 
-      send(ws, {
-        type: "your-score",
-        score,
-        totalScore: room.scores[ws.playerId],
-        round: room.round
-      });
+      let score = Number(data.score);
 
-      send(opponent, {
-        type: "opponent-score",
-        score,
-        totalScore: room.scores[ws.playerId],
-        round: room.round
-      });
+      if (!Number.isFinite(score)) score = 0;
+
+      score = Math.max(0, Math.min(100, Math.round(score)));
+
+      room.roundScores[ws.id] = score;
+
+      if (
+        room.roundScores[room.a.id] !== undefined &&
+        room.roundScores[room.b.id] !== undefined
+      ) {
+        const aScore = room.roundScores[room.a.id];
+        const bScore = room.roundScores[room.b.id];
+
+        if (aScore > bScore) {
+          room.scores[room.a.id]++;
+        } else if (bScore > aScore) {
+          room.scores[room.b.id]++;
+        }
+
+        let winnerUsername = null;
+
+        if (aScore > bScore) winnerUsername = room.a.username;
+        if (bScore > aScore) winnerUsername = room.b.username;
+
+        safeSend(room.a, {
+          type: "round-result",
+          round: room.round,
+          scores: {
+            [room.a.username]: aScore,
+            [room.b.username]: bScore
+          },
+          totals: {
+            [room.a.username]: room.scores[room.a.id],
+            [room.b.username]: room.scores[room.b.id]
+          },
+          winnerUsername
+        });
+
+        safeSend(room.b, {
+          type: "round-result",
+          round: room.round,
+          scores: {
+            [room.a.username]: aScore,
+            [room.b.username]: bScore
+          },
+          totals: {
+            [room.a.username]: room.scores[room.a.id],
+            [room.b.username]: room.scores[room.b.id]
+          },
+          winnerUsername
+        });
+
+        room.nextRoundTimer = setTimeout(() => {
+          room.nextRoundTimer = null;
+
+          if (rooms.has(room.id) && !room.completed) {
+            sendNextRound(room);
+          }
+        }, 2200);
+      }
 
       return;
     }
 
-    if (
-      message.type === "hunt-found" &&
-      room.mode === "hunt" &&
-      !room.huntFound
-    ) {
+    if (type === "hunt-found") {
+      const room = getRoom(ws);
+
+      if (!room || room.mode !== "hunt") return;
+      if (room.completed || room.huntFound) return;
+
+      clearHuntTimer(room);
+
       room.huntFound = true;
 
-      room.scores[ws.playerId] += 1;
+      room.scores[ws.id]++;
 
-      send(room.a, {
+      const winnerUsername = ws.username;
+
+      const payload = {
         type: "hunt-winner",
-        winnerId: ws.playerId,
         round: room.round,
-        scores: room.scores
-      });
+        winnerUsername,
+        target: room.target,
+        scores: {
+          [room.a.username]: room.scores[room.a.id],
+          [room.b.username]: room.scores[room.b.id]
+        }
+      };
 
-      send(room.b, {
-        type: "hunt-winner",
-        winnerId: ws.playerId,
-        round: room.round,
-        scores: room.scores
-      });
+      safeSend(room.a, payload);
+      safeSend(room.b, payload);
 
-      setTimeout(() => {
-        if (rooms.get(room.id) === room) {
+      room.nextRoundTimer = setTimeout(() => {
+        room.nextRoundTimer = null;
+
+        if (rooms.has(room.id) && !room.completed) {
           sendNextRound(room);
         }
       }, 2200);
@@ -1060,89 +1346,112 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (
-      message.type === "next-round" &&
-      room.mode === "face"
-    ) {
-      room.nextReady.add(ws.playerId);
+    if (type === "next-round") {
+      const room = getRoom(ws);
+
+      if (!room) return;
+
+      room.nextReady.add(ws.id);
 
       if (room.nextReady.size === 2) {
+        room.nextReady.clear();
         sendNextRound(room);
       }
 
       return;
     }
 
-    if (
-      message.type === "chat-message" &&
-      room.mode === "chat"
-    ) {
-      const text = String(
-        message.text || ""
-      ).slice(0, 300);
+    if (type === "chat-message") {
+      const room = getRoom(ws);
 
-      if (text) {
-        send(opponent, {
-          type: "chat-message",
-          text
-        });
+      if (!room || room.mode !== "chat") return;
 
-        send(ws, {
-          type: "chat-message",
-          text,
-          self: true
-        });
-      }
+      const text = String(data.text || "")
+        .trim()
+        .slice(0, 500);
+
+      if (!text) return;
+
+      const opponent = otherPlayer(room, ws);
+
+      safeSend(opponent, {
+        type: "chat-message",
+        from: ws.username,
+        text,
+        timestamp: Date.now()
+      });
+
+      safeSend(ws, {
+        type: "chat-message",
+        from: ws.username,
+        text,
+        timestamp: Date.now()
+      });
 
       return;
     }
 
-    if (
-      message.type === "signal" &&
-      opponent
-    ) {
-      send(opponent, {
+    if (type === "signal") {
+      const room = getRoom(ws);
+
+      if (!room) return;
+
+      const opponent = otherPlayer(room, ws);
+
+      if (!opponent) return;
+
+      safeSend(opponent, {
         type: "signal",
-        signal: message.signal,
-        from: ws.playerId
+        from: ws.username,
+        signal: data.signal
       });
+
+      return;
     }
   });
 
   ws.on("close", () => {
-    clients.delete(ws);
-
     removeFromWaiting(ws);
 
-    endRoom(ws, true);
-
-    for (
-      const [id, invite]
-      of pendingInvites
-    ) {
+    for (const [inviteId, invite] of pendingInvites.entries()) {
       if (
         invite.from === ws.username ||
         invite.to === ws.username
       ) {
-        pendingInvites.delete(id);
+        pendingInvites.delete(inviteId);
       }
     }
 
+    const room = getRoom(ws);
+
+    if (room) {
+      clearRoomTimers(room);
+
+      const opponent = otherPlayer(room, ws);
+
+      rooms.delete(room.id);
+
+      room.a.roomId = null;
+      room.b.roomId = null;
+
+      if (opponent) {
+        safeSend(opponent, {
+          type: "opponent-left",
+          username: ws.username
+        });
+      }
+    }
+
+    clients.delete(ws.id);
+
     broadcastOnline();
 
-    for (
-      const name
-      of ensureSet(friends, ws.username)
-    ) {
-      sendFriends(name);
+    for (const username of onlineUsernames()) {
+      sendFriendsTo(username);
     }
   });
 });
 
-const PORT = process.env.PORT || 3000;
-
-server.listen(
-  PORT,
-  "0.0.0.0",
-  () => console.log(`EmojiTV running on port ${PORT}`)
-);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`EmojiTV server running on port ${PORT}`);
+});
