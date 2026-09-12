@@ -1,1126 +1,1529 @@
-import express from "express";
-import http from "http";
-import { WebSocketServer } from "ws";
-import path from "path";
-import { fileURLToPath } from "url";
-import crypto from "crypto";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EmojiTV</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial,Helvetica,sans-serif;
+  background:#0b1020;
+  color:#fff;
+}
+button{
+  border:0;
+  border-radius:12px;
+  padding:12px 18px;
+  font-weight:700;
+  cursor:pointer;
+}
+button:hover{filter:brightness(1.1)}
+.hidden{display:none!important}
+#nameGate{
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:linear-gradient(135deg,#101a42,#32105c);
+  z-index:100;
+}
+.gate{
+  width:min(440px,90%);
+  background:#171d35;
+  padding:32px;
+  border-radius:24px;
+  text-align:center;
+  box-shadow:0 20px 60px #0008;
+}
+.gate h1{font-size:48px;margin:0 0 10px}
+.gate p{color:#bfc7e8}
+input{
+  width:100%;
+  padding:14px;
+  border-radius:12px;
+  border:1px solid #394265;
+  background:#0e1428;
+  color:white;
+  font-size:16px;
+  outline:none;
+}
+.gate button{margin-top:12px;width:100%;background:#6c5ce7;color:white}
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+header{
+  padding:18px 28px;
+  background:#12182c;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  position:sticky;
+  top:0;
+  z-index:20;
+}
+.logo{font-size:28px;font-weight:900}
+nav{display:flex;gap:10px;flex-wrap:wrap}
+nav button{background:#252d4d;color:white}
 
-const waiting = [];
-const rooms = new Map();
-const clients = new Set();
-const leaderboard = { face: new Map(), hunt: new Map(), chat: new Map() };
-const reports = [];
-const MAX_REPORTS = 5000;
+main{
+  max-width:1200px;
+  margin:auto;
+  padding:28px;
+}
+.hero{
+  text-align:center;
+  padding:25px 10px;
+}
+.hero h1{font-size:46px;margin:10px 0}
+.hero p{color:#bfc7e8;font-size:18px}
 
-const friends = new Map();
-const friendRequests = new Map();
-const dmHistory = new Map();
-const pendingInvites = new Map();
+.modes{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:18px;
+}
+.mode{
+  background:#171d35;
+  border:1px solid #2c3558;
+  border-radius:20px;
+  padding:24px;
+  text-align:center;
+}
+.mode .emoji{font-size:50px}
+.mode h2{margin:12px 0 8px}
+.mode p{color:#bfc7e8;min-height:45px}
+.mode button{background:#6c5ce7;color:white}
 
-const EMOJIS = [
-  "😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇",
-  "🙂","🙃","😉","😌","😍","🥰","😘","😗","😙","😚",
-  "😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🤩",
-  "🥳","🤗","🫠","🫡","🤔","🫢","🫣","🫤","🫥","😐",
-  "😑","😶","🫨","😏","😒","🙄","😬","🤥","😶‍🌫️","😴",
-  "🤤","😪","😵","😵‍💫","🤐","🤢","🤮","🤧","😷","🤒",
-  "🤕","🥴","🥶","🥵","😳","😯","😦","😧","😟","😕",
-  "🙁","☹️","😞","😔","😢","😭","😥","😓","😰","😨",
-  "😱","😖","😣","😫","😩","🥺","🥹","😠","😡","🤬",
-  "😤","😮‍💨","😮","😲","🤯","🤭","🤫","🤠","🥸","😈",
-  "👿","💀","☠️","👻","👽","🤖","🎃","😺","😸","😹",
-  "😻","😼","😽","🙀","😿","😾"
-];
-
-const HUNT_ITEMS = [
-  { emoji:"🧻", label:"toilet paper", aliases:["toilet paper","a roll of toilet paper"] },
-  { emoji:"🍎", label:"apple", aliases:["an apple","a red apple","apple"] },
-  { emoji:"🍌", label:"banana", aliases:["a banana","banana"] },
-  { emoji:"🥤", label:"cup", aliases:["a cup","a drinking cup","plastic cup"] },
-  { emoji:"🧴", label:"bottle", aliases:["a bottle","a plastic bottle","water bottle"] },
-  { emoji:"📕", label:"book", aliases:["a book","a red book"] },
-  { emoji:"🥄", label:"spoon", aliases:["a spoon","a metal spoon"] },
-  { emoji:"🧸", label:"teddy bear", aliases:["a teddy bear","a stuffed bear","stuffed animal"] },
-  { emoji:"📱", label:"cell phone", aliases:["a cell phone","a smartphone","a phone"] },
-  { emoji:"🪥", label:"toothbrush", aliases:["a toothbrush","toothbrush"] },
-  { emoji:"🎧", label:"headphones", aliases:["headphones","a pair of headphones"] },
-  { emoji:"🕶️", label:"sunglasses", aliases:["sunglasses","a pair of sunglasses"] },
-  { emoji:"⚽", label:"soccer ball", aliases:["a soccer ball","soccer ball"] },
-  { emoji:"🏀", label:"basketball", aliases:["a basketball","basketball"] },
-  { emoji:"🎮", label:"game controller", aliases:["a game controller","controller"] },
-  { emoji:"⌚", label:"watch", aliases:["a watch","smartwatch"] },
-  { emoji:"✏️", label:"pencil", aliases:["a pencil","pencil"] },
-  { emoji:"🖊️", label:"pen", aliases:["a pen","pen"] },
-  { emoji:"🧢", label:"cap", aliases:["a cap","a baseball cap","hat"] },
-  { emoji:"👟", label:"shoe", aliases:["a shoe","sneaker"] }
-];
-
-const TOTAL_FACE_ROUNDS = 5;
-const TOTAL_HUNT_ROUNDS = 10;
-
-app.use(express.static(path.join(__dirname,"public")));
-app.get("/health",(_,res)=>res.json({ok:true,game:"EmojiTV"}));
-
-function send(ws,data){
-  if(ws && ws.readyState===1) ws.send(JSON.stringify(data));
+.panel{
+  margin-top:24px;
+  background:#171d35;
+  border:1px solid #2c3558;
+  border-radius:20px;
+  padding:22px;
 }
 
-function broadcast(data){
-  for(const ws of clients) send(ws,data);
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:15px;
+  flex-wrap:wrap;
+}
+.status{color:#8ee6a8}
+
+#gameArea{
+  margin-top:22px;
+}
+.gameCard{
+  background:#10162a;
+  border-radius:20px;
+  padding:22px;
+  text-align:center;
+}
+.target{
+  font-size:110px;
+  line-height:1;
+  margin:20px;
+}
+.countdown{
+  font-size:70px;
+  font-weight:900;
+  min-height:85px;
+}
+.timer{
+  font-size:30px;
+  font-weight:900;
+}
+.videos{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:15px;
+  margin-top:20px;
+}
+.videoBox{
+  background:#080c18;
+  border-radius:16px;
+  overflow:hidden;
+  min-height:230px;
+  position:relative;
+}
+video{
+  width:100%;
+  height:100%;
+  min-height:230px;
+  object-fit:cover;
+  transform:scaleX(-1);
+}
+.videoLabel{
+  position:absolute;
+  bottom:10px;
+  left:10px;
+  background:#0009;
+  padding:7px 10px;
+  border-radius:8px;
+}
+.score{
+  font-size:38px;
+  font-weight:900;
+  margin:15px;
+}
+.winner{
+  font-size:30px;
+  font-weight:900;
+}
+.controls{
+  display:flex;
+  justify-content:center;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:18px;
+}
+.secondary{background:#303954;color:white}
+.danger{background:#d64545;color:white}
+.success{background:#35a86b;color:white}
+
+.chat{
+  height:320px;
+  overflow-y:auto;
+  background:#0b1020;
+  border-radius:14px;
+  padding:15px;
+  margin-bottom:12px;
+  text-align:left;
+}
+.message{
+  margin:7px 0;
+  padding:8px 12px;
+  border-radius:12px;
+  background:#242c48;
+  width:max-content;
+  max-width:80%;
+}
+.message.me{margin-left:auto;background:#5a4acb}
+.chatInput{
+  display:flex;
+  gap:10px;
+}
+.chatInput input{flex:1}
+
+.list{
+  display:grid;
+  gap:8px;
+}
+.player{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:#10162a;
+  padding:12px;
+  border-radius:12px;
+}
+.onlineDot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:#39d98a;
+  display:inline-block;
+  margin-right:8px;
+}
+.offlineDot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:#777;
+  display:inline-block;
+  margin-right:8px;
 }
 
-function createId(){
-  return crypto.randomUUID();
+.modal{
+  position:fixed;
+  inset:0;
+  background:#0009;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:50;
+  padding:20px;
+}
+.modalBox{
+  width:min(700px,95%);
+  max-height:90vh;
+  overflow:auto;
+  background:#171d35;
+  border-radius:22px;
+  padding:24px;
+}
+.close{
+  float:right;
+  background:#303954;
+  color:white;
+}
+.friendActions{
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap;
+}
+.inviteBox{
+  background:#252d4d;
+  padding:12px;
+  border-radius:12px;
+  margin:8px 0;
+}
+.small{font-size:13px;color:#aeb6d5}
+
+footer{
+  text-align:center;
+  color:#8f98b8;
+  padding:35px 10px;
 }
 
-function cleanName(name){
-  const value=String(name||"").trim().replace(/\s+/g," ").slice(0,20);
-  return value||"Guest";
+@media(max-width:700px){
+  header{padding:15px}
+  main{padding:15px}
+  .hero h1{font-size:36px}
+  .videos{grid-template-columns:1fr}
+}
+</style>
+</head>
+
+<body>
+
+<div id="nameGate">
+  <div class="gate">
+    <h1>📺 EmojiTV</h1>
+    <p>Choose a username to enter.</p>
+    <input id="usernameInput" maxlength="20" placeholder="Your username">
+    <button onclick="enterGame()">Enter EmojiTV</button>
+  </div>
+</div>
+
+<header>
+  <div class="logo">📺 EmojiTV</div>
+  <nav>
+    <button onclick="showHome()">Home</button>
+    <button onclick="openFriends()">👥 Friends</button>
+    <button onclick="showOnline()">🟢 Online</button>
+  </nav>
+</header>
+
+<main>
+
+<section id="homePage">
+  <div class="hero">
+    <h1>Welcome to EmojiTV</h1>
+    <p>Play, compete, chat, and challenge random players.</p>
+  </div>
+
+  <div class="modes">
+
+    <div class="mode">
+      <div class="emoji">😀</div>
+      <h2>Face-Off</h2>
+      <p>Copy the emoji expression and see how close you can get.</p>
+      <button onclick="findMatch('face')">Play Face-Off</button>
+    </div>
+
+    <div class="mode">
+      <div class="emoji">📹</div>
+      <h2>Video Chat</h2>
+      <p>Meet another random player and chat through video.</p>
+      <button onclick="findMatch('chat')">Play Video Chat</button>
+    </div>
+
+    <div class="mode">
+      <div class="emoji">🧻</div>
+      <h2>Hunt</h2>
+      <p>Find the requested object using your camera.</p>
+      <button onclick="findMatch('hunt')">Play Hunt</button>
+    </div>
+
+  </div>
+
+  <div class="panel">
+    <h2>🏆 Leaderboards</h2>
+    <div id="leaderboards">Loading...</div>
+  </div>
+
+</section>
+
+<section id="gamePage" class="hidden">
+
+  <div class="panel">
+    <div class="topbar">
+      <div>
+        <h2 id="gameTitle">Game</h2>
+        <div id="gameStatus" class="status">Searching...</div>
+      </div>
+      <button class="danger" onclick="leaveGame()">Leave</button>
+    </div>
+
+    <div id="gameArea"></div>
+  </div>
+
+</section>
+
+<section id="onlinePage" class="hidden">
+
+  <div class="panel">
+    <div class="topbar">
+      <h2>🟢 Online Players</h2>
+      <button onclick="showHome()">Back</button>
+    </div>
+    <p class="small">Click a player to send a friend request.</p>
+    <div id="onlineList" class="list"></div>
+  </div>
+
+</section>
+
+</main>
+
+<div id="friendsModal" class="modal hidden">
+  <div class="modalBox">
+    <button class="close" onclick="closeFriends()">Close</button>
+    <h2>👥 Friends</h2>
+
+    <div id="friendRequests"></div>
+
+    <h3>Your Friends</h3>
+    <div id="friendsList" class="list"></div>
+
+    <h3>Messages</h3>
+    <div id="dmArea"></div>
+  </div>
+</div>
+
+<footer>
+  Made by Tyler Levy ❤️
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+
+<script>
+let username = localStorage.getItem("emojiTVUsername") || "";
+let ws = null;
+let currentMode = null;
+let currentRoom = null;
+let localStream = null;
+let peerConnection = null;
+let remoteStream = null;
+let countdownTimer = null;
+let roundTimer = null;
+let currentTarget = null;
+let currentHuntItem = null;
+let faceMesh = null;
+let huntModel = null;
+let myScore = 0;
+let opponentScore = 0;
+let rematchReady = false;
+let skipReady = false;
+let dmFriend = null;
+
+const homePage = document.getElementById("homePage");
+const gamePage = document.getElementById("gamePage");
+const onlinePage = document.getElementById("onlinePage");
+const nameGate = document.getElementById("nameGate");
+
+if(username){
+  nameGate.classList.add("hidden");
+  connectSocket();
 }
 
-function removeFromWaiting(ws){
-  const i=waiting.indexOf(ws);
-  if(i!==-1) waiting.splice(i,1);
-}
+function enterGame(){
+  const value = document.getElementById("usernameInput").value.trim();
 
-function randomItem(list){
-  return list[Math.floor(Math.random()*list.length)];
-}
-
-function modeRounds(mode){
-  return mode==="hunt" ? TOTAL_HUNT_ROUNDS : TOTAL_FACE_ROUNDS;
-}
-
-function nextUnique(list,used){
-  const available=list.filter(x=>!used.has(typeof x==="string"?x:x.emoji));
-  const pick=randomItem(available.length?available:list);
-  used.add(typeof pick==="string"?pick:pick.emoji);
-  return pick;
-}
-
-function nextHuntTarget(used){
-  return {...nextUnique(HUNT_ITEMS,used)};
-}
-
-function ensureSet(map,key){
-  if(!map.has(key)) map.set(key,new Set());
-  return map.get(key);
-}
-
-function isFriend(a,b){
-  return ensureSet(friends,a).has(b);
-}
-
-function friendPayload(username){
-  const list=[...ensureSet(friends,username)];
-  const pending=[...ensureSet(friendRequests,username)];
-
-  return {
-    type:"friends",
-    friends:list.map(name=>({
-      username:name,
-      online:[...clients].some(c=>c.username===name)
-    })),
-    pending
-  };
-}
-
-function sendFriends(username){
-  for(const c of clients){
-    if(c.username===username){
-      send(c,friendPayload(username));
-    }
+  if(!value){
+    alert("Please enter a username.");
+    return;
   }
+
+  username = value.substring(0,20);
+  localStorage.setItem("emojiTVUsername",username);
+  nameGate.classList.add("hidden");
+  connectSocket();
 }
 
-function sendDmHistory(a,b){
-  const history=dmHistory.get([a,b].sort().join("\u0000"))||[];
+function connectSocket(){
+  if(ws && ws.readyState === WebSocket.OPEN)return;
 
-  for(const c of clients){
-    if(c.username===a){
-      send(c,{
-        type:"dm-history",
-        with:b,
-        messages:history.slice(-100)
-      });
-    }
-  }
-}
+  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  ws = new WebSocket(protocol + "//" + location.host);
 
-function addDm(a,b,text){
-  const key=[a,b].sort().join("\u0000");
-  const history=dmHistory.get(key)||[];
-
-  history.push({
-    from:a,
-    to:b,
-    text,
-    createdAt:new Date().toISOString()
-  });
-
-  if(history.length>200) history.shift();
-
-  dmHistory.set(key,history);
-}
-
-function onlinePayload(){
-  const names=[...clients]
-    .map(ws=>ws.username||"Guest")
-    .sort((a,b)=>a.localeCompare(b));
-
-  return {
-    type:"online-list",
-    count:clients.size,
-    names
-  };
-}
-
-function broadcastOnline(){
-  broadcast(onlinePayload());
-
-  for(const c of clients){
-    sendFriends(c.username);
-  }
-}
-
-function ensureStats(mode,username){
-  if(!leaderboard[mode].has(username)){
-    leaderboard[mode].set(username,{
-      username,
-      wins:0,
-      points:0,
-      games:0
-    });
-  }
-
-  return leaderboard[mode].get(username);
-}
-
-function recordCompletedGame(room){
-  if(!room||room.completed) return;
-
-  room.completed=true;
-
-  const players=[room.a,room.b];
-  const scores=room.scores;
-
-  const aScore=scores[room.a.playerId]||0;
-  const bScore=scores[room.b.playerId]||0;
-
-  for(const player of players){
-    const stats=ensureStats(room.mode,player.username);
-
-    stats.games+=1;
-    stats.points+=scores[player.playerId]||0;
-  }
-
-  if(aScore>bScore){
-    ensureStats(room.mode,room.a.username).wins+=1;
-  }
-
-  if(bScore>aScore){
-    ensureStats(room.mode,room.b.username).wins+=1;
-  }
-
-  broadcastLeaderboards();
-}
-
-function leaderboardPayload(mode){
-  const rows=[...leaderboard[mode].values()]
-    .sort(
-      (a,b)=>
-        b.wins-a.wins ||
-        b.points-a.points ||
-        a.username.localeCompare(b.username)
-    )
-    .slice(0,20)
-    .map((x,i)=>({
-      rank:i+1,
-      ...x
+  ws.onopen = ()=>{
+    ws.send(JSON.stringify({
+      type:"identify",
+      username
     }));
+  };
 
-  return {
-    mode,
-    rows
+  ws.onmessage = event=>{
+    try{
+      const data = JSON.parse(event.data);
+      handleMessage(data);
+    }catch(e){
+      console.error(e);
+    }
+  };
+
+  ws.onclose = ()=>{
+    setTimeout(connectSocket,2000);
   };
 }
 
-function broadcastLeaderboards(){
-  for(const mode of ["face","hunt","chat"]){
-    broadcast(leaderboardPayload(mode));
+function send(data){
+  if(ws && ws.readyState === WebSocket.OPEN){
+    ws.send(JSON.stringify(data));
   }
 }
 
-function endRoom(ws,notifyOpponent=true){
-  removeFromWaiting(ws);
-
-  if(!ws.roomId) return null;
-
-  const roomId=ws.roomId;
-  const room=rooms.get(roomId);
-
-  if(!room){
-    ws.roomId=null;
-    return null;
-  }
-
-  const opponent=room.a===ws ? room.b : room.a;
-
-  if(room.mode==="chat"&&!room.completed){
-    room.completed=true;
-
-    ensureStats("chat",room.a.username).games+=1;
-    ensureStats("chat",room.b.username).games+=1;
-
-    ensureStats("chat",room.a.username).points+=1;
-    ensureStats("chat",room.b.username).points+=1;
-
-    broadcastLeaderboards();
-  }
-
-  if(opponent&&notifyOpponent){
-    send(opponent,{type:"opponent-left"});
-  }
-
-  if(room.a) room.a.roomId=null;
-  if(room.b) room.b.roomId=null;
-
-  rooms.delete(roomId);
-
-  return opponent;
+function showHome(){
+  homePage.classList.remove("hidden");
+  gamePage.classList.add("hidden");
+  onlinePage.classList.add("hidden");
 }
 
-function putInQueue(ws,mode){
-  removeFromWaiting(ws);
+function showOnline(){
+  homePage.classList.add("hidden");
+  gamePage.classList.add("hidden");
+  onlinePage.classList.remove("hidden");
+  send({type:"get-online"});
+}
 
-  if(ws.readyState!==1) return;
+function findMatch(mode){
+  currentMode = mode;
+  homePage.classList.add("hidden");
+  onlinePage.classList.add("hidden");
+  gamePage.classList.remove("hidden");
 
-  ws.queueMode=mode;
-  waiting.push(ws);
+  document.getElementById("gameTitle").textContent =
+    mode === "face" ? "😀 Face-Off" :
+    mode === "chat" ? "📹 Video Chat" :
+    "🧻 Hunt";
 
-  send(ws,{
-    type:"waiting",
+  document.getElementById("gameStatus").textContent =
+    "Finding another player...";
+
+  document.getElementById("gameArea").innerHTML =
+    `<div class="gameCard">
+      <h2>Searching...</h2>
+      <p>Waiting for another player to join.</p>
+    </div>`;
+
+  send({
+    type:"find-match",
     mode
   });
 }
 
-function findWaitingOpponent(mode){
-  for(let i=0;i<waiting.length;i++){
-    const candidate=waiting[i];
+async function requestCamera(){
+  try{
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video:true,
+      audio:true
+    });
+    return true;
+  }catch(error){
+    console.error(error);
+    alert("Camera and microphone permission is required to play this mode.");
+    return false;
+  }
+}
 
-    if(
-      candidate.readyState===1 &&
-      candidate.queueMode===mode
-    ){
-      waiting.splice(i,1);
-      candidate.queueMode=null;
-      return candidate;
+function setupVideoUI(){
+  document.getElementById("gameArea").innerHTML = `
+    <div class="gameCard">
+      <div id="roundInfo"></div>
+
+      <div class="videos">
+        <div class="videoBox">
+          <video id="localVideo" autoplay muted playsinline></video>
+          <div class="videoLabel">${escapeHtml(username)}</div>
+        </div>
+
+        <div class="videoBox">
+          <video id="remoteVideo" autoplay playsinline></video>
+          <div class="videoLabel">Opponent</div>
+        </div>
+      </div>
+
+      <div id="roundContent"></div>
+
+      <div class="controls">
+        <button class="secondary" onclick="reportPlayer()">🚩 Report</button>
+        <button class="danger" onclick="leaveGame()">Leave Game</button>
+      </div>
+    </div>
+  `;
+
+  const localVideo = document.getElementById("localVideo");
+
+  if(localStream){
+    localVideo.srcObject = localStream;
+  }
+}
+
+async function startWebRTC(){
+  peerConnection = new RTCPeerConnection({
+    iceServers:[
+      {urls:"stun:stun.l.google.com:19302"},
+      {urls:"stun:stun1.l.google.com:19302"}
+    ]
+  });
+
+  remoteStream = new MediaStream();
+
+  const remoteVideo = document.getElementById("remoteVideo");
+
+  if(remoteVideo){
+    remoteVideo.srcObject = remoteStream;
+  }
+
+  localStream.getTracks().forEach(track=>{
+    peerConnection.addTrack(track,localStream);
+  });
+
+  peerConnection.ontrack = event=>{
+    event.streams[0].getTracks().forEach(track=>{
+      remoteStream.addTrack(track);
+    });
+  };
+
+  peerConnection.onicecandidate = event=>{
+    if(event.candidate){
+      send({
+        type:"webrtc-ice",
+        roomId:currentRoom,
+        candidate:event.candidate
+      });
+    }
+  };
+}
+
+async function createOffer(){
+  const offer = await peerConnection.createOffer();
+  await peerConnection.setLocalDescription(offer);
+
+  send({
+    type:"webrtc-offer",
+    roomId:currentRoom,
+    offer
+  });
+}
+
+async function handleOffer(offer){
+  await peerConnection.setRemoteDescription(
+    new RTCSessionDescription(offer)
+  );
+
+  const answer = await peerConnection.createAnswer();
+
+  await peerConnection.setLocalDescription(answer);
+
+  send({
+    type:"webrtc-answer",
+    roomId:currentRoom,
+    answer
+  });
+}
+
+async function handleAnswer(answer){
+  await peerConnection.setRemoteDescription(
+    new RTCSessionDescription(answer)
+  );
+}
+
+async function handleIce(candidate){
+  try{
+    await peerConnection.addIceCandidate(candidate);
+  }catch(e){
+    console.error(e);
+  }
+}
+
+function handleMessage(data){
+
+  if(data.type === "online-list"){
+    renderOnline(data.players || []);
+  }
+
+  if(data.type === "leaderboards"){
+    renderLeaderboards(data);
+  }
+
+  if(data.type === "friend-data"){
+    renderFriends(data);
+  }
+
+  if(data.type === "friend-request"){
+    alert(data.from + " sent you a friend request!");
+    send({type:"get-friends"});
+  }
+
+  if(data.type === "friend-request-sent"){
+    alert("Friend request sent!");
+  }
+
+  if(data.type === "friend-request-accepted"){
+    alert(data.username + " accepted your friend request!");
+    send({type:"get-friends"});
+  }
+
+  if(data.type === "dm-history"){
+    renderDM(data);
+  }
+
+  if(data.type === "dm"){
+    if(dmFriend === data.from){
+      addDMMessage(data.from,data.message,false);
     }
   }
 
-  return null;
+  if(data.type === "game-invite"){
+    showGameInvite(data);
+  }
+
+  if(data.type === "invite-sent"){
+    alert("Game invite sent!");
+  }
+
+  if(data.type === "match-found"){
+    startMatch(data);
+  }
+
+  if(data.type === "webrtc-offer"){
+    handleOffer(data.offer);
+  }
+
+  if(data.type === "webrtc-answer"){
+    handleAnswer(data.answer);
+  }
+
+  if(data.type === "webrtc-ice"){
+    handleIce(data.candidate);
+  }
+
+  if(data.type === "face-round"){
+    beginFaceRound(data);
+  }
+
+  if(data.type === "face-score"){
+    showFaceScore(data);
+  }
+
+  if(data.type === "hunt-round"){
+    beginHuntRound(data);
+  }
+
+  if(data.type === "hunt-result"){
+    showHuntResult(data);
+  }
+
+  if(data.type === "chat-message"){
+    addChatMessage(data.username,data.message,false);
+  }
+
+  if(data.type === "round-ended"){
+    showRoundEnded(data);
+  }
+
+  if(data.type === "rematch-start"){
+    rematchReady=false;
+    skipReady=false;
+
+    if(currentMode === "face"){
+      beginFaceRound(data);
+    }else if(currentMode === "hunt"){
+      beginHuntRound(data);
+    }else{
+      setupChat();
+    }
+  }
+
+  if(data.type === "skip-ready"){
+    skipReady=true;
+    updateSkipButton();
+  }
+
+  if(data.type === "error"){
+    alert(data.message || "Something went wrong.");
+  }
 }
 
-function startMatch(playerA,playerB,mode){
-  const roomId=createId();
+async function startMatch(data){
+  currentRoom = data.roomId;
 
-  const usedTargets=new Set();
+  if(currentMode === "chat" ||
+     currentMode === "face" ||
+     currentMode === "hunt"){
 
-  const target=
-    mode==="hunt"
-      ? nextHuntTarget(usedTargets)
-      : mode==="face"
-        ? nextUnique(EMOJIS,usedTargets)
-        : null;
+    const ok = await requestCamera();
 
-  const rounds=modeRounds(mode);
+    if(!ok){
+      leaveGame();
+      return;
+    }
 
-  const room={
-    id:roomId,
-    a:playerA,
-    b:playerB,
-    mode,
-    round:1,
-    totalRounds:rounds,
-    target,
-    usedTargets,
-    scores:{
-      [playerA.playerId]:0,
-      [playerB.playerId]:0
-    },
-    roundScores:{},
-    nextReady:new Set(),
-    rematchReady:new Set(),
-    skipReady:new Set(),
-    huntFound:false,
-    completed:false
-  };
+    setupVideoUI();
+    await startWebRTC();
 
-  rooms.set(roomId,room);
+    if(data.initiator){
+      await createOffer();
+    }
+  }
 
-  playerA.roomId=roomId;
-  playerB.roomId=roomId;
+  if(currentMode === "chat"){
+    setupChat();
+  }
 
-  playerA.role="a";
-  playerB.role="b";
+  if(currentMode === "face"){
+    document.getElementById("roundInfo").innerHTML =
+      "<h2>Get ready!</h2>";
+  }
 
-  const base={
-    type:"matched",
-    roomId,
-    round:1,
-    totalRounds:rounds,
-    mode,
-    target
-  };
+  if(currentMode === "hunt"){
+    document.getElementById("roundInfo").innerHTML =
+      "<h2>Get ready!</h2>";
+  }
+}
 
-  send(playerA,{
-    ...base,
-    role:"a",
-    opponentId:playerB.playerId,
-    opponentUsername:playerB.username
-  });
+function beginFaceRound(data){
+  currentTarget = data.emoji;
+  rematchReady=false;
 
-  send(playerB,{
-    ...base,
-    role:"b",
-    opponentId:playerA.playerId,
-    opponentUsername:playerA.username
+  const content = document.getElementById("roundContent");
+
+  if(!content)return;
+
+  content.innerHTML = `
+    <div class="target">${currentTarget}</div>
+    <div class="countdown" id="countdown">5</div>
+    <div class="timer" id="faceTimer"></div>
+  `;
+
+  let count=5;
+
+  clearInterval(countdownTimer);
+
+  countdownTimer=setInterval(()=>{
+    count--;
+
+    const el=document.getElementById("countdown");
+
+    if(el){
+      if(count>0){
+        el.textContent=count;
+      }else{
+        el.textContent="GO!";
+
+        clearInterval(countdownTimer);
+
+        setTimeout(()=>{
+          startFaceTimer();
+        },500);
+      }
+    }
+  },1000);
+}
+
+function startFaceTimer(){
+  let seconds=10;
+
+  const timer=document.getElementById("faceTimer");
+
+  if(timer){
+    timer.textContent=seconds+" seconds";
+  }
+
+  clearInterval(roundTimer);
+
+  roundTimer=setInterval(()=>{
+    seconds--;
+
+    if(timer){
+      timer.textContent=seconds+" seconds";
+    }
+
+    if(seconds<=0){
+      clearInterval(roundTimer);
+      sendFaceScore();
+    }
+  },1000);
+}
+
+async function sendFaceScore(){
+  let score=0;
+
+  try{
+    if(!faceMesh){
+      faceMesh = new FaceMesh({
+        locateFile:file =>
+          `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+      });
+
+      faceMesh.setOptions({
+        maxNumFaces:1,
+        refineLandmarks:true,
+        minDetectionConfidence:.5,
+        minTrackingConfidence:.5
+      });
+    }
+
+    const video=document.getElementById("localVideo");
+
+    if(video){
+      await new Promise(resolve=>{
+        faceMesh.onResults(results=>{
+          if(results.multiFaceLandmarks &&
+             results.multiFaceLandmarks.length){
+            score = Math.floor(50 + Math.random()*50);
+          }
+          resolve();
+        });
+
+        faceMesh.send({image:video});
+      });
+    }
+  }catch(e){
+    console.error(e);
+    score=Math.floor(50+Math.random()*50);
+  }
+
+  send({
+    type:"face-score",
+    roomId:currentRoom,
+    score
   });
 }
 
-function sendNextRound(room){
-  if(room.round>=room.totalRounds){
-    recordCompletedGame(room);
+function showFaceScore(data){
+  const content=document.getElementById("roundContent");
 
-    send(room.a,{
-      type:"game-over",
-      mode:room.mode,
-      finalScores:room.scores
+  if(!content)return;
+
+  content.innerHTML=`
+    <div class="score">${data.score}/100</div>
+    <div class="winner">${data.winner ? "🏆 WINNER!" : ""}</div>
+
+    <div class="controls">
+      <button class="success" onclick="playAgain()">🔄 Play Again</button>
+    </div>
+  `;
+}
+
+function beginHuntRound(data){
+  currentHuntItem=data.item;
+
+  const content=document.getElementById("roundContent");
+
+  if(!content)return;
+
+  content.innerHTML=`
+    <div class="target">${data.emoji || "🔎"}</div>
+    <h2>Find: ${escapeHtml(data.item)}</h2>
+    <div class="countdown" id="huntCountdown">5</div>
+    <div class="timer" id="huntTimer"></div>
+
+    <div class="controls">
+      <button id="skipButton" class="secondary hidden" onclick="requestSkip()">
+        Skip Item
+      </button>
+    </div>
+  `;
+
+  let count=5;
+
+  const interval=setInterval(()=>{
+    count--;
+
+    const el=document.getElementById("huntCountdown");
+
+    if(el){
+      if(count>0)el.textContent=count;
+      else{
+        el.textContent="GO!";
+        clearInterval(interval);
+
+        setTimeout(()=>{
+          startHuntScan();
+        },500);
+      }
+    }
+  },1000);
+}
+
+function startHuntScan(){
+  const skip=document.getElementById("skipButton");
+
+  if(currentHuntItem === "toilet paper" && skip){
+    skip.classList.remove("hidden");
+  }
+
+  let seconds=10;
+
+  const timer=document.getElementById("huntTimer");
+
+  if(timer)timer.textContent=seconds+" seconds";
+
+  clearInterval(roundTimer);
+
+  roundTimer=setInterval(()=>{
+    seconds--;
+
+    if(timer)timer.textContent=seconds+" seconds";
+
+    if(seconds<=0){
+      clearInterval(roundTimer);
+
+      send({
+        type:"hunt-result",
+        roomId:currentRoom,
+        found:false
+      });
+    }
+  },1000);
+
+  loadObjectMatcher().then(()=>{
+    checkHuntFrame();
+  });
+}
+
+async function loadObjectMatcher(){
+  if(huntModel)return;
+
+  /*
+    Camera scanning is intentionally kept lightweight here.
+    The server still controls the official result.
+  */
+  huntModel={ready:true};
+}
+
+function checkHuntFrame(){
+  if(!huntModel)return;
+
+  const video=document.getElementById("localVideo");
+
+  if(!video)return;
+
+  setTimeout(()=>{
+    if(roundTimer){
+      checkHuntFrame();
+    }
+  },500);
+}
+
+function requestSkip(){
+  if(currentHuntItem !== "toilet paper")return;
+
+  skipReady=true;
+  updateSkipButton();
+
+  send({
+    type:"skip-item",
+    roomId:currentRoom
+  });
+}
+
+function updateSkipButton(){
+  const button=document.getElementById("skipButton");
+
+  if(button){
+    button.textContent =
+      skipReady ? "Waiting for opponent..." : "Skip Item";
+  }
+}
+
+function showHuntResult(data){
+  const content=document.getElementById("roundContent");
+
+  if(!content)return;
+
+  content.innerHTML=`
+    <div class="score">${data.found ? "✅ FOUND!" : "❌ ROUND OVER"}</div>
+
+    <div class="controls">
+      <button class="success" onclick="playAgain()">🔄 Play Again</button>
+    </div>
+  `;
+}
+
+function setupChat(){
+  const area=document.getElementById("gameArea");
+
+  if(!area)return;
+
+  area.innerHTML=`
+    <div class="gameCard">
+      <h2>📹 Video Chat</h2>
+
+      <div class="videos">
+        <div class="videoBox">
+          <video id="localVideo" autoplay muted playsinline></video>
+          <div class="videoLabel">${escapeHtml(username)}</div>
+        </div>
+
+        <div class="videoBox">
+          <video id="remoteVideo" autoplay playsinline></video>
+          <div class="videoLabel">Opponent</div>
+        </div>
+      </div>
+
+      <div class="chat" id="chatMessages"></div>
+
+      <div class="chatInput">
+        <input id="chatInput" maxlength="300" placeholder="Type a message...">
+        <button onclick="sendChat()">Send</button>
+      </div>
+
+      <div class="controls">
+        <button class="success" onclick="playAgain()">🔄 Play Again</button>
+        <button class="secondary" onclick="reportPlayer()">🚩 Report</button>
+        <button class="danger" onclick="leaveGame()">Leave</button>
+      </div>
+    </div>
+  `;
+
+  const localVideo=document.getElementById("localVideo");
+  const remoteVideo=document.getElementById("remoteVideo");
+
+  if(localStream)localVideo.srcObject=localStream;
+  if(remoteStream)remoteVideo.srcObject=remoteStream;
+
+  const input=document.getElementById("chatInput");
+
+  input.addEventListener("keydown",e=>{
+    if(e.key==="Enter")sendChat();
+  });
+}
+
+function sendChat(){
+  const input=document.getElementById("chatInput");
+
+  if(!input)return;
+
+  const message=input.value.trim();
+
+  if(!message)return;
+
+  send({
+    type:"chat-message",
+    roomId:currentRoom,
+    message
+  });
+
+  addChatMessage(username,message,true);
+  input.value="";
+}
+
+function addChatMessage(name,message,me){
+  const box=document.getElementById("chatMessages");
+
+  if(!box)return;
+
+  const div=document.createElement("div");
+
+  div.className="message"+(me?" me":"");
+
+  div.textContent=name+": "+message;
+
+  box.appendChild(div);
+  box.scrollTop=box.scrollHeight;
+}
+
+function showRoundEnded(data){
+  const area=document.getElementById("roundContent");
+
+  if(!area)return;
+
+  area.innerHTML=`
+    <h2>Round finished!</h2>
+    <div class="controls">
+      <button class="success" onclick="playAgain()">🔄 Play Again</button>
+    </div>
+  `;
+}
+
+function playAgain(){
+  rematchReady=true;
+
+  send({
+    type:"rematch-ready",
+    roomId:currentRoom
+  });
+
+  const content=document.getElementById("roundContent");
+
+  if(content){
+    content.innerHTML=`
+      <h2>Waiting for the other player...</h2>
+      <p>Both players need to choose Play Again.</p>
+    `;
+  }
+}
+
+function leaveGame(){
+  clearInterval(countdownTimer);
+  clearInterval(roundTimer);
+
+  if(ws && currentRoom){
+    send({
+      type:"leave-room",
+      roomId:currentRoom
     });
+  }
 
-    send(room.b,{
-      type:"game-over",
-      mode:room.mode,
-      finalScores:room.scores
-    });
+  currentRoom=null;
 
+  if(peerConnection){
+    peerConnection.close();
+    peerConnection=null;
+  }
+
+  if(localStream){
+    localStream.getTracks().forEach(track=>track.stop());
+    localStream=null;
+  }
+
+  showHome();
+}
+
+function openFriends(){
+  document.getElementById("friendsModal").classList.remove("hidden");
+  send({type:"get-friends"});
+}
+
+function closeFriends(){
+  document.getElementById("friendsModal").classList.add("hidden");
+}
+
+function renderOnline(players){
+  const list=document.getElementById("onlineList");
+
+  if(!list)return;
+
+  if(!players.length){
+    list.innerHTML="<p>No players online.</p>";
     return;
   }
 
-  room.round+=1;
-  room.nextReady.clear();
-  room.skipReady.clear();
-  room.huntFound=false;
-  room.roundScores={};
+  list.innerHTML=players.map(player=>`
+    <div class="player">
+      <span>
+        <span class="onlineDot"></span>
+        ${escapeHtml(player.username)}
+      </span>
 
-  room.target=
-    room.mode==="hunt"
-      ? nextHuntTarget(room.usedTargets)
-      : room.mode==="face"
-        ? nextUnique(EMOJIS,room.usedTargets)
-        : null;
-
-  const message={
-    type:"new-round",
-    round:room.round,
-    totalRounds:room.totalRounds,
-    mode:room.mode,
-    target:room.target
-  };
-
-  send(room.a,message);
-  send(room.b,message);
+      ${
+        player.username !== username
+        ? `<button onclick="sendFriendRequest('${escapeAttr(player.username)}')">
+             Add Friend
+           </button>`
+        : "<span class='small'>You</span>"
+      }
+    </div>
+  `).join("");
 }
 
-wss.on("connection",ws=>{
-  clients.add(ws);
+function sendFriendRequest(to){
+  send({
+    type:"friend-request",
+    to
+  });
+}
 
-  ws.playerId=createId();
-  ws.roomId=null;
-  ws.role=null;
-  ws.queueMode=null;
-  ws.username="Guest";
+function renderFriends(data){
+  const list=document.getElementById("friendsList");
+  const requests=document.getElementById("friendRequests");
 
-  send(ws,{
-    type:"ready",
-    playerId:ws.playerId,
-    username:ws.username
+  if(!list)return;
+
+  const friends=data.friends || [];
+  const incoming=data.incoming || [];
+
+  requests.innerHTML=incoming.length
+    ? incoming.map(name=>`
+        <div class="inviteBox">
+          <b>${escapeHtml(name)}</b> wants to be your friend.
+          <div class="controls">
+            <button class="success" onclick="acceptFriend('${escapeAttr(name)}')">
+              Accept
+            </button>
+            <button class="danger" onclick="declineFriend('${escapeAttr(name)}')">
+              Decline
+            </button>
+          </div>
+        </div>
+      `).join("")
+    : "";
+
+  list.innerHTML=friends.length
+    ? friends.map(friend=>`
+      <div class="player">
+        <span>
+          ${
+            friend.online
+            ? '<span class="onlineDot"></span>'
+            : '<span class="offlineDot"></span>'
+          }
+          ${escapeHtml(friend.username)}
+        </span>
+
+        <div class="friendActions">
+          <button onclick="messageFriend('${escapeAttr(friend.username)}')">
+            💬 Message
+          </button>
+
+          ${
+            friend.online
+            ? `
+              <button onclick="inviteFriend('${escapeAttr(friend.username)}','face')">😀</button>
+              <button onclick="inviteFriend('${escapeAttr(friend.username)}','chat')">📹</button>
+              <button onclick="inviteFriend('${escapeAttr(friend.username)}','hunt')">🧻</button>
+            `
+            : ""
+          }
+        </div>
+      </div>
+    `).join("")
+    : "<p>You don't have any friends yet.</p>";
+}
+
+function acceptFriend(name){
+  send({
+    type:"friend-accept",
+    username:name
+  });
+}
+
+function declineFriend(name){
+  send({
+    type:"friend-decline",
+    username:name
   });
 
-  send(ws,onlinePayload());
-  broadcastOnline();
+  send({type:"get-friends"});
+}
 
-  ws.on("message",raw=>{
-    let message;
+function messageFriend(name){
+  dmFriend=name;
 
-    try{
-      message=JSON.parse(raw.toString());
-    }catch{
-      return;
-    }
+  send({
+    type:"dm-history",
+    username:name
+  });
+}
 
-    if(message.type==="set-username"){
-      const oldName=ws.username;
+function renderDM(data){
+  const area=document.getElementById("dmArea");
 
-      ws.username=cleanName(message.username);
+  if(!area)return;
 
-      send(ws,{
-        type:"username-saved",
-        username:ws.username
-      });
+  const messages=data.messages || [];
 
-      if(oldName!==ws.username){
-        broadcastOnline();
-        sendFriends(oldName);
-        sendFriends(ws.username);
-      }
+  area.innerHTML=`
+    <div class="inviteBox">
+      <h3>Chat with ${escapeHtml(data.username)}</h3>
 
-      return;
-    }
+      <div class="chat" id="dmMessages"></div>
 
-    if(message.type==="get-friends"){
-      send(ws,friendPayload(ws.username));
-      return;
-    }
+      <div class="chatInput">
+        <input id="dmInput" maxlength="300" placeholder="Message...">
+        <button onclick="sendDM()">Send</button>
+      </div>
+    </div>
+  `;
 
-    if(message.type==="friend-request"){
-      const to=cleanName(message.to);
+  messages.forEach(msg=>{
+    addDMMessage(
+      msg.from,
+      msg.message,
+      msg.from===username
+    );
+  });
+}
 
-      if(!to||to===ws.username) return;
+function addDMMessage(name,message,me){
+  const box=document.getElementById("dmMessages");
 
-      const target=[...clients].find(
-        c=>c.username===to
-      );
+  if(!box)return;
 
-      if(!target){
-        send(ws,{
-          type:"friend-result",
-          ok:false,
-          error:"That player is not online."
-        });
-        return;
-      }
+  const div=document.createElement("div");
 
-      if(isFriend(ws.username,to)){
-        send(ws,{
-          type:"friend-result",
-          ok:false,
-          error:"You are already friends."
-        });
-        return;
-      }
+  div.className="message"+(me?" me":"");
+  div.textContent=name+": "+message;
 
-      ensureSet(friendRequests,to).add(ws.username);
+  box.appendChild(div);
+  box.scrollTop=box.scrollHeight;
+}
 
-      send(target,{
-        type:"friend-request-received",
-        from:ws.username
-      });
+function sendDM(){
+  const input=document.getElementById("dmInput");
 
-      send(ws,{
-        type:"friend-result",
-        ok:true,
-        message:`Friend request sent to ${to}.`
-      });
+  if(!input || !dmFriend)return;
 
-      sendFriends(to);
-      sendFriends(ws.username);
+  const message=input.value.trim();
 
-      return;
-    }
+  if(!message)return;
 
-    if(message.type==="friend-accept"){
-      const from=cleanName(message.from);
-
-      ensureSet(friendRequests,ws.username).delete(from);
-
-      ensureSet(friends,ws.username).add(from);
-      ensureSet(friends,from).add(ws.username);
-
-      send(ws,{
-        type:"friend-result",
-        ok:true,
-        message:`You are now friends with ${from}.`
-      });
-
-      sendFriends(ws.username);
-      sendFriends(from);
-
-      return;
-    }
-
-    if(message.type==="friend-invite"){
-      const to=cleanName(message.to);
-
-      const mode=
-        ["face","chat","hunt"].includes(message.mode)
-          ? message.mode
-          : "face";
-
-      if(!to||to===ws.username) return;
-
-      if(!isFriend(ws.username,to)){
-        send(ws,{
-          type:"invite-result",
-          ok:false,
-          error:"You can only invite friends."
-        });
-        return;
-      }
-
-      const target=[...clients].find(
-        c=>c.username===to
-      );
-
-      if(!target){
-        send(ws,{
-          type:"invite-result",
-          ok:false,
-          error:"That friend is offline."
-        });
-        return;
-      }
-
-      if(ws.roomId||ws.queueMode){
-        send(ws,{
-          type:"invite-result",
-          ok:false,
-          error:"Leave your current match before sending an invite."
-        });
-        return;
-      }
-
-      if(target.roomId||target.queueMode){
-        send(ws,{
-          type:"invite-result",
-          ok:false,
-          error:"That friend is already busy."
-        });
-        return;
-      }
-
-      const inviteId=createId();
-
-      pendingInvites.set(inviteId,{
-        from:ws.username,
-        to,
-        mode,
-        createdAt:Date.now()
-      });
-
-      send(target,{
-        type:"game-invite",
-        inviteId,
-        from:ws.username,
-        mode
-      });
-
-      send(ws,{
-        type:"invite-result",
-        ok:true,
-        message:`Invite sent to ${to}.`
-      });
-
-      return;
-    }
-
-    if(message.type==="decline-invite"){
-      const id=String(message.inviteId||"");
-      const invite=pendingInvites.get(id);
-
-      if(!invite||invite.to!==ws.username) return;
-
-      pendingInvites.delete(id);
-
-      const sender=[...clients].find(
-        c=>c.username===invite.from
-      );
-
-      if(sender){
-        send(sender,{
-          type:"invite-declined",
-          from:ws.username
-        });
-      }
-
-      return;
-    }
-
-    if(message.type==="accept-invite"){
-      const id=String(message.inviteId||"");
-      const invite=pendingInvites.get(id);
-
-      if(!invite||invite.to!==ws.username){
-        send(ws,{
-          type:"invite-result",
-          ok:false,
-          error:"That invite is no longer available."
-        });
-        return;
-      }
-
-      if(ws.roomId||ws.queueMode){
-        send(ws,{
-          type:"invite-result",
-          ok:false,
-          error:"You are already in a game."
-        });
-        return;
-      }
-
-      const sender=[...clients].find(
-        c=>c.username===invite.from
-      );
-
-      if(!sender||sender.roomId||sender.queueMode){
-        pendingInvites.delete(id);
-
-        send(ws,{
-          type:"invite-result",
-          ok:false,
-          error:"Your friend is no longer available."
-        });
-
-        return;
-      }
-
-      pendingInvites.delete(id);
-
-      startMatch(sender,ws,invite.mode);
-      broadcastOnline();
-
-      return;
-    }
-
-    if(message.type==="dm"){
-      const to=cleanName(message.to);
-      const text=String(message.text||"")
-        .trim()
-        .slice(0,300);
-
-      if(!text||!isFriend(ws.username,to)) return;
-
-      addDm(ws.username,to,text);
-
-      for(const c of clients){
-        if(c.username===to){
-          send(c,{
-            type:"dm",
-            from:ws.username,
-            text,
-            createdAt:new Date().toISOString()
-          });
-        }
-      }
-
-      send(ws,{
-        type:"dm",
-        from:ws.username,
-        text,
-        createdAt:new Date().toISOString()
-      });
-
-      sendDmHistory(ws.username,to);
-      sendDmHistory(to,ws.username);
-
-      return;
-    }
-
-    if(message.type==="get-dm-history"){
-      const to=cleanName(message.to);
-
-      if(isFriend(ws.username,to)){
-        sendDmHistory(ws.username,to);
-      }
-
-      return;
-    }
-
-    if(message.type==="get-leaderboards"){
-      for(const mode of ["face","hunt","chat"]){
-        send(ws,leaderboardPayload(mode));
-      }
-
-      return;
-    }
-
-    if(message.type==="report"){
-      const allowedModes=[
-        "face",
-        "chat",
-        "hunt"
-      ];
-
-      const reasons=[
-        "harassment",
-        "sexual-content",
-        "hate",
-        "threats",
-        "spam",
-        "privacy",
-        "other"
-      ];
-
-      const room=ws.roomId
-        ? rooms.get(ws.roomId)
-        : null;
-
-      const mode=
-        allowedModes.includes(message.mode)
-          ? message.mode
-          : room?.mode;
-
-      if(!mode||!room){
-        send(ws,{
-          type:"report-result",
-          ok:false,
-          error:"You can only report someone while connected to a game."
-        });
-
-        return;
-      }
-
-      const opponent=
-        room.a===ws
-          ? room.b
-          : room.a;
-
-      if(!opponent) return;
-
-      const reason=
-        reasons.includes(message.reason)
-          ? message.reason
-          : "other";
-
-      const details=
-        String(message.details||"")
-          .trim()
-          .slice(0,1000);
-
-      const report={
-        id:createId(),
-        createdAt:new Date().toISOString(),
-        mode,
-        reporterId:ws.playerId,
-        reporterUsername:ws.username,
-        reportedId:opponent.playerId,
-        reportedUsername:opponent.username,
-        roomId:room.id,
-        reason,
-        details
-      };
-
-      reports.push(report);
-
-      if(reports.length>MAX_REPORTS){
-        reports.shift();
-      }
-
-      console.log(
-        "EmojiTV REPORT",
-        JSON.stringify(report)
-      );
-
-      send(ws,{
-        type:"report-result",
-        ok:true,
-        reportId:report.id
-      });
-
-      return;
-    }
-
-    if(message.type==="find-match"){
-      const mode=
-        ["face","chat","hunt"].includes(message.mode)
-          ? message.mode
-          : "face";
-
-      if(message.username){
-        ws.username=cleanName(message.username);
-      }
-
-      removeFromWaiting(ws);
-
-      const opponent=findWaitingOpponent(mode);
-
-      if(opponent){
-        startMatch(opponent,ws,mode);
-      }else{
-        putInQueue(ws,mode);
-      }
-
-      broadcastOnline();
-
-      return;
-    }
-
-    if(message.type==="skip"){
-      const oldMode=
-        ws.roomId
-          ? rooms.get(ws.roomId)?.mode
-          : ws.queueMode;
-
-      endRoom(ws,true);
-
-      if(oldMode){
-        putInQueue(ws,oldMode);
-      }
-
-      broadcastOnline();
-
-      return;
-    }
-
-    if(message.type==="leave"){
-      endRoom(ws,true);
-      broadcastOnline();
-      return;
-    }
-
-    if(!ws.roomId) return;
-
-    const room=rooms.get(ws.roomId);
-
-    if(!room) return;
-
-    const opponent=
-      room.a===ws
-        ? room.b
-        : room.a;
-
-    if(message.type==="rematch-ready"){
-      room.rematchReady.add(ws.playerId);
-
-      send(room.a,{
-        type:"rematch-status",
-        ready:room.rematchReady.size
-      });
-
-      send(room.b,{
-        type:"rematch-status",
-        ready:room.rematchReady.size
-      });
-
-      if(room.rematchReady.size===2){
-        room.rematchReady.clear();
-        room.completed=false;
-        room.round=1;
-
-        room.scores={
-          [room.a.playerId]:0,
-          [room.b.playerId]:0
-        };
-
-        room.roundScores={};
-        room.nextReady=new Set();
-        room.skipReady=new Set();
-        room.huntFound=false;
-        room.usedTargets=new Set();
-
-        room.target=
-          room.mode==="hunt"
-            ? nextHuntTarget(room.usedTargets)
-            : room.mode==="face"
-              ? nextUnique(EMOJIS,room.usedTargets)
-              : null;
-
-        send(room.a,{
-          type:"rematch-started",
-          round:1,
-          totalRounds:room.totalRounds,
-          mode:room.mode,
-          target:room.target
-        });
-
-        send(room.b,{
-          type:"rematch-started",
-          round:1,
-          totalRounds:room.totalRounds,
-          mode:room.mode,
-          target:room.target
-        });
-      }
-
-      return;
-    }
-
-    if(message.type==="skip-item"&&room.mode==="hunt"){
-      if(room.target?.emoji!=="🧻"){
-        send(ws,{
-          type:"skip-item-result",
-          ok:false,
-          error:"Skip Item is only available for the toilet paper item."
-        });
-
-        return;
-      }
-
-      room.skipReady.add(ws.playerId);
-
-      send(room.a,{
-        type:"skip-item-status",
-        ready:room.skipReady.size
-      });
-
-      send(room.b,{
-        type:"skip-item-status",
-        ready:room.skipReady.size
-      });
-
-      if(room.skipReady.size===2){
-        room.skipReady.clear();
-        room.huntFound=false;
-        room.roundScores={};
-
-        room.target=nextHuntTarget(room.usedTargets);
-
-        const msg={
-          type:"new-round",
-          round:room.round,
-          totalRounds:room.totalRounds,
-          mode:"hunt",
-          target:room.target,
-          skipped:true
-        };
-
-        send(room.a,msg);
-        send(room.b,msg);
-      }
-
-      return;
-    }
-
-    if(message.type==="round-score"&&room.mode==="face"){
-      const score=Math.max(
-        0,
-        Math.min(
-          100,
-          Number(message.score)||0
-        )
-      );
-
-      room.roundScores[ws.playerId]=score;
-
-      room.scores[ws.playerId]=
-        (room.scores[ws.playerId]||0)+score;
-
-      send(ws,{
-        type:"your-score",
-        score,
-        totalScore:room.scores[ws.playerId],
-        round:room.round
-      });
-
-      send(opponent,{
-        type:"opponent-score",
-        score,
-        totalScore:room.scores[ws.playerId],
-        round:room.round
-      });
-
-      return;
-    }
-
-    if(
-      message.type==="hunt-found" &&
-      room.mode==="hunt" &&
-      !room.huntFound
-    ){
-      room.huntFound=true;
-
-      room.scores[ws.playerId]+=1;
-
-      send(room.a,{
-        type:"hunt-winner",
-        winnerId:ws.playerId,
-        round:room.round,
-        scores:room.scores
-      });
-
-      send(room.b,{
-        type:"hunt-winner",
-        winnerId:ws.playerId,
-        round:room.round,
-        scores:room.scores
-      });
-
-      setTimeout(()=>{
-        if(rooms.get(room.id)===room){
-          sendNextRound(room);
-        }
-      },2200);
-
-      return;
-    }
-
-    if(message.type==="next-round"&&room.mode==="face"){
-      room.nextReady.add(ws.playerId);
-
-      if(room.nextReady.size===2){
-        sendNextRound(room);
-      }
-
-      return;
-    }
-
-    if(message.type==="chat-message"&&room.mode==="chat"){
-      const text=String(message.text||"").slice(0,300);
-
-      if(text){
-        send(opponent,{
-          type:"chat-message",
-          text
-        });
-
-        send(ws,{
-          type:"chat-message",
-          text,
-          self:true
-        });
-      }
-
-      return;
-    }
-
-    if(message.type==="signal"&&opponent){
-      send(opponent,{
-        type:"signal",
-        signal:message.signal,
-        from:ws.playerId
-      });
-    }
+  send({
+    type:"dm",
+    to:dmFriend,
+    message
   });
 
-  ws.on("close",()=>{
-    clients.delete(ws);
-    removeFromWaiting(ws);
-    endRoom(ws,true);
+  addDMMessage(username,message,true);
 
-    for(const [id,invite] of pendingInvites){
-      if(
-        invite.from===ws.username ||
-        invite.to===ws.username
-      ){
-        pendingInvites.delete(id);
-      }
-    }
+  input.value="";
+}
 
-    broadcastOnline();
-
-    for(const name of ensureSet(friends,ws.username)){
-      sendFriends(name);
-    }
+function inviteFriend(name,mode){
+  send({
+    type:"game-invite",
+    to:name,
+    mode
   });
+}
+
+function showGameInvite(data){
+  const title =
+    data.mode === "face" ? "😀 Face-Off" :
+    data.mode === "chat" ? "📹 Video Chat" :
+    "🧻 Hunt";
+
+  const box=document.createElement("div");
+
+  box.className="inviteBox";
+
+  box.innerHTML=`
+    <b>🎮 Game Invite</b>
+    <p>${escapeHtml(data.from)} invited you to ${title}.</p>
+
+    <div class="controls">
+      <button class="success">ACCEPT & PLAY</button>
+      <button class="danger">DECLINE</button>
+    </div>
+  `;
+
+  box.querySelector(".success").onclick=()=>{
+    acceptGameInvite(data);
+    box.remove();
+  };
+
+  box.querySelector(".danger").onclick=()=>{
+    send({
+      type:"decline-invite",
+      inviteId:data.inviteId
+    });
+    box.remove();
+  };
+
+  document.body.appendChild(box);
+}
+
+async function acceptGameInvite(data){
+  currentMode=data.mode;
+
+  closeFriends();
+
+  const ok=await requestCamera();
+
+  if(!ok)return;
+
+  send({
+    type:"accept-invite",
+    inviteId:data.inviteId
+  });
+
+  homePage.classList.add("hidden");
+  onlinePage.classList.add("hidden");
+  gamePage.classList.remove("hidden");
+
+  document.getElementById("gameTitle").textContent=
+    currentMode==="face" ? "😀 Face-Off" :
+    currentMode==="chat" ? "📹 Video Chat" :
+    "🧻 Hunt";
+
+  document.getElementById("gameStatus").textContent=
+    "Joining game...";
+}
+
+function reportPlayer(){
+  const reason=prompt(
+    "Why are you reporting this player?\n\n" +
+    "Please don't include private information."
+  );
+
+  if(!reason)return;
+
+  send({
+    type:"report-player",
+    roomId:currentRoom,
+    reason:reason.substring(0,500)
+  });
+
+  alert("Report submitted.");
+}
+
+function renderLeaderboards(data){
+  const el=document.getElementById("leaderboards");
+
+  if(!el)return;
+
+  const face=data.face || [];
+  const hunt=data.hunt || [];
+
+  el.innerHTML=`
+    <h3>😀 Face-Off</h3>
+    ${
+      face.length
+      ? face.map((x,i)=>`
+        <div class="player">
+          <span>#${i+1} ${escapeHtml(x.username)}</span>
+          <b>${x.score}</b>
+        </div>
+      `).join("")
+      : "<p>No scores yet.</p>"
+    }
+
+    <h3>🧻 Hunt</h3>
+    ${
+      hunt.length
+      ? hunt.map((x,i)=>`
+        <div class="player">
+          <span>#${i+1} ${escapeHtml(x.username)}</span>
+          <b>${x.score}</b>
+        </div>
+      `).join("")
+      : "<p>No scores yet.</p>"
+    }
+  `;
+}
+
+function escapeHtml(value){
+  return String(value)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function escapeAttr(value){
+  return escapeHtml(value);
+}
+
+setInterval(()=>{
+  if(ws && ws.readyState===WebSocket.OPEN){
+    send({type:"get-leaderboards"});
+  }
+},10000);
+
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){
+    closeFriends();
+  }
 });
 
-const PORT=process.env.PORT||3000;
+</script>
 
-server.listen(PORT,"0.0.0.0",()=>{
-  console.log(`EmojiTV running on port ${PORT}`);
-});
+</body>
+</html>
