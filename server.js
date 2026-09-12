@@ -21,7 +21,6 @@ const friendRequests = new Map();
 const dmHistory = new Map();
 const pendingInvites = new Map();
 
-
 const EMOJIS = [
   "😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇","🙂","🙃","😉","😌","😍","🥰","😘","😗","😙","😚","😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🤩","🥳","🤗","🫠","🫡","🤔","🫢","🫣","🫤","🫥","😐","😑","😶","🫨","😏","😒","🙄","😬","🤥","😶‍🌫️","😴","🤤","😪","😵","😵‍💫","🤐","🤢","🤮","🤧","😷","🤒","🤕","🥴","🥶","🥵","😳","😯","😦","😧","😟","😕","🙁","☹️","😞","😔","😢","😭","😥","😓","😰","😨","😱","😖","😣","😫","😩","🥺","🥹","😠","😡","🤬","😤","😮‍💨","😮","😲","🤯","🤭","🤫","🤠","🥸","😈","👿","💀","☠️","👻","👽","🤖","🎃","😺","😸","😹","😻","😼","😽","🙀","😿","😾"
 ];
@@ -51,16 +50,25 @@ const HUNT_ITEMS = [
 
 const TOTAL_FACE_ROUNDS = 5;
 const TOTAL_HUNT_ROUNDS = 10;
+const HUNT_SECONDS = 60;
+const HUNT_TIMEOUT_MS = HUNT_SECONDS * 1000;
 
 app.use(express.static(path.join(__dirname, "public")));
-app.get("/health", (_, res) => res.json({ ok: true, game: "EmojiTV" }));
+
+app.get("/health", (_, res) => {
+  res.json({ ok: true, game: "EmojiTV" });
+});
 
 function send(ws, data) {
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify(data));
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify(data));
+  }
 }
 
 function broadcast(data) {
-  for (const ws of clients) send(ws, data);
+  for (const ws of clients) {
+    send(ws, data);
+  }
 }
 
 function createId() {
@@ -68,13 +76,20 @@ function createId() {
 }
 
 function cleanName(name) {
-  const value = String(name || "").trim().replace(/\s+/g, " ").slice(0, 20);
+  const value = String(name || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 20);
+
   return value || "Guest";
 }
 
 function removeFromWaiting(ws) {
   const i = waiting.indexOf(ws);
-  if (i !== -1) waiting.splice(i, 1);
+
+  if (i !== -1) {
+    waiting.splice(i, 1);
+  }
 }
 
 function randomItem(list) {
@@ -86,9 +101,14 @@ function modeRounds(mode) {
 }
 
 function nextUnique(list, used) {
-  const available = list.filter(x => !used.has(typeof x === "string" ? x : x.emoji));
+  const available = list.filter(x =>
+    !used.has(typeof x === "string" ? x : x.emoji)
+  );
+
   const pick = randomItem(available.length ? available : list);
+
   used.add(typeof pick === "string" ? pick : pick.emoji);
+
   return pick;
 }
 
@@ -101,7 +121,10 @@ function pairKey(a, b) {
 }
 
 function ensureSet(map, key) {
-  if (!map.has(key)) map.set(key, new Set());
+  if (!map.has(key)) {
+    map.set(key, new Set());
+  }
+
   return map.get(key);
 }
 
@@ -125,7 +148,9 @@ function friendPayload(username) {
 
 function sendFriends(username) {
   for (const c of clients) {
-    if (c.username === username) send(c, friendPayload(username));
+    if (c.username === username) {
+      send(c, friendPayload(username));
+    }
   }
 }
 
@@ -154,7 +179,9 @@ function addDm(a, b, text) {
     createdAt: new Date().toISOString()
   });
 
-  if (h.length > 200) h.shift();
+  if (h.length > 200) {
+    h.shift();
+  }
 
   dmHistory.set(key, h);
 }
@@ -193,7 +220,9 @@ function ensureStats(mode, username) {
 }
 
 function recordCompletedGame(room) {
-  if (!room || room.completed) return;
+  if (!room || room.completed) {
+    return;
+  }
 
   room.completed = true;
 
@@ -250,7 +279,9 @@ function broadcastLeaderboards() {
 function endRoom(ws, notifyOpponent = true) {
   removeFromWaiting(ws);
 
-  if (!ws.roomId) return null;
+  if (!ws.roomId) {
+    return null;
+  }
 
   const roomId = ws.roomId;
   const room = rooms.get(roomId);
@@ -258,6 +289,11 @@ function endRoom(ws, notifyOpponent = true) {
   if (!room) {
     ws.roomId = null;
     return null;
+  }
+
+  if (room.huntTimer) {
+    clearTimeout(room.huntTimer);
+    room.huntTimer = null;
   }
 
   const opponent = room.a === ws ? room.b : room.a;
@@ -275,11 +311,18 @@ function endRoom(ws, notifyOpponent = true) {
   }
 
   if (opponent && notifyOpponent) {
-    send(opponent, { type: "opponent-left" });
+    send(opponent, {
+      type: "opponent-left"
+    });
   }
 
-  if (room.a) room.a.roomId = null;
-  if (room.b) room.b.roomId = null;
+  if (room.a) {
+    room.a.roomId = null;
+  }
+
+  if (room.b) {
+    room.b.roomId = null;
+  }
 
   rooms.delete(roomId);
 
@@ -289,9 +332,12 @@ function endRoom(ws, notifyOpponent = true) {
 function putInQueue(ws, mode) {
   removeFromWaiting(ws);
 
-  if (ws.readyState !== 1) return;
+  if (ws.readyState !== 1) {
+    return;
+  }
 
   ws.queueMode = mode;
+
   waiting.push(ws);
 
   send(ws, {
@@ -310,11 +356,47 @@ function findWaitingOpponent(mode) {
     ) {
       waiting.splice(i, 1);
       candidate.queueMode = null;
+
       return candidate;
     }
   }
 
   return null;
+}
+
+function scheduleHuntTimeout(room) {
+  if (room.huntTimer) {
+    clearTimeout(room.huntTimer);
+  }
+
+  room.huntStartedAt = Date.now();
+
+  if (room.mode !== "hunt") {
+    return;
+  }
+
+  room.huntTimer = setTimeout(() => {
+    if (
+      rooms.get(room.id) !== room ||
+      room.huntFound
+    ) {
+      return;
+    }
+
+    room.huntFound = true;
+
+    send(room.a, {
+      type: "hunt-timeout",
+      round: room.round
+    });
+
+    send(room.b, {
+      type: "hunt-timeout",
+      round: room.round
+    });
+
+    sendNextRound(room);
+  }, HUNT_TIMEOUT_MS + 100);
 }
 
 function startMatch(playerA, playerB, mode) {
@@ -324,8 +406,8 @@ function startMatch(playerA, playerB, mode) {
     mode === "hunt"
       ? nextHuntTarget(new Set())
       : mode === "face"
-      ? nextUnique(EMOJIS, new Set())
-      : null;
+        ? nextUnique(EMOJIS, new Set())
+        : null;
 
   const rounds = modeRounds(mode);
 
@@ -337,17 +419,23 @@ function startMatch(playerA, playerB, mode) {
     round: 1,
     totalRounds: rounds,
     target,
+
     usedTargets: new Set([target]),
+
     scores: {
       [playerA.playerId]: 0,
       [playerB.playerId]: 0
     },
+
     roundScores: {},
     nextReady: new Set(),
     rematchReady: new Set(),
     skipReady: new Set(),
+
     huntFound: false,
-    completed: false
+    completed: false,
+    huntTimer: null,
+    huntStartedAt: null
   };
 
   rooms.set(roomId, room);
@@ -380,6 +468,8 @@ function startMatch(playerA, playerB, mode) {
     opponentId: playerA.playerId,
     opponentUsername: playerA.username
   });
+
+  scheduleHuntTimeout(room);
 }
 
 function sendNextRound(room) {
@@ -410,8 +500,8 @@ function sendNextRound(room) {
     room.mode === "hunt"
       ? nextHuntTarget(room.usedTargets)
       : room.mode === "face"
-      ? nextUnique(EMOJIS, room.usedTargets)
-      : null;
+        ? nextUnique(EMOJIS, room.usedTargets)
+        : null;
 
   const message = {
     type: "new-round",
@@ -423,16 +513,17 @@ function sendNextRound(room) {
 
   send(room.a, message);
   send(room.b, message);
+
+  scheduleHuntTimeout(room);
 }
 
 wss.on("connection", ws => {
-  clients.add(ws);
-
   ws.playerId = createId();
+  ws.username = `Guest-${ws.playerId.slice(0, 4)}`;
   ws.roomId = null;
-  ws.role = null;
   ws.queueMode = null;
-  ws.username = "Guest";
+
+  clients.add(ws);
 
   send(ws, {
     type: "ready",
@@ -440,7 +531,6 @@ wss.on("connection", ws => {
     username: ws.username
   });
 
-  send(ws, onlinePayload());
   broadcastOnline();
 
   ws.on("message", raw => {
@@ -452,34 +542,49 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (message.type === "set-username") {
-      const oldName = ws.username;
+    if (!message || typeof message !== "object") {
+      return;
+    }
 
-      ws.username = cleanName(message.username);
+    if (message.type === "set-username") {
+      const newName = cleanName(message.username);
+
+      const taken = [...clients].some(
+        c => c !== ws && c.username.toLowerCase() === newName.toLowerCase()
+      );
+
+      if (taken) {
+        send(ws, {
+          type: "username-saved",
+          username: ws.username,
+          error: "That username is already being used."
+        });
+
+        return;
+      }
+
+      ws.username = newName;
 
       send(ws, {
         type: "username-saved",
         username: ws.username
       });
 
-      if (oldName !== ws.username) {
-        broadcastOnline();
-        sendFriends(oldName);
-        sendFriends(ws.username);
-      }
-
+      broadcastOnline();
       return;
     }
 
     if (message.type === "get-friends") {
-      send(ws, friendPayload(ws.username));
+      sendFriends(ws.username);
       return;
     }
 
     if (message.type === "friend-request") {
       const to = cleanName(message.to);
 
-      if (!to || to === ws.username) return;
+      if (!to || to === ws.username) {
+        return;
+      }
 
       const target = [...clients].find(
         c => c.username === to
@@ -547,11 +652,17 @@ wss.on("connection", ws => {
     if (message.type === "friend-invite") {
       const to = cleanName(message.to);
 
-      const mode = ["face", "chat", "hunt"].includes(message.mode)
+      const mode = [
+        "face",
+        "chat",
+        "hunt"
+      ].includes(message.mode)
         ? message.mode
         : "face";
 
-      if (!to || to === ws.username) return;
+      if (!to || to === ws.username) {
+        return;
+      }
 
       if (!isFriend(ws.username, to)) {
         send(ws, {
@@ -626,7 +737,9 @@ wss.on("connection", ws => {
       const id = String(message.inviteId || "");
       const invite = pendingInvites.get(id);
 
-      if (!invite || invite.to !== ws.username) return;
+      if (!invite || invite.to !== ws.username) {
+        return;
+      }
 
       pendingInvites.delete(id);
 
@@ -648,7 +761,10 @@ wss.on("connection", ws => {
       const id = String(message.inviteId || "");
       const invite = pendingInvites.get(id);
 
-      if (!invite || invite.to !== ws.username) {
+      if (
+        !invite ||
+        invite.to !== ws.username
+      ) {
         send(ws, {
           type: "invite-result",
           ok: false,
@@ -702,7 +818,12 @@ wss.on("connection", ws => {
         .trim()
         .slice(0, 300);
 
-      if (!text || !isFriend(ws.username, to)) return;
+      if (
+        !text ||
+        !isFriend(ws.username, to)
+      ) {
+        return;
+      }
 
       addDm(ws.username, to, text);
 
@@ -741,7 +862,11 @@ wss.on("connection", ws => {
     }
 
     if (message.type === "get-leaderboards") {
-      for (const mode of ["face", "hunt", "chat"]) {
+      for (const mode of [
+        "face",
+        "hunt",
+        "chat"
+      ]) {
         send(ws, leaderboardPayload(mode));
       }
 
@@ -749,7 +874,11 @@ wss.on("connection", ws => {
     }
 
     if (message.type === "report") {
-      const allowedModes = ["face", "chat", "hunt"];
+      const allowedModes = [
+        "face",
+        "chat",
+        "hunt"
+      ];
 
       const reasons = [
         "harassment",
@@ -784,13 +913,17 @@ wss.on("connection", ws => {
           ? room.b
           : room.a;
 
-      if (!opponent) return;
+      if (!opponent) {
+        return;
+      }
 
       const reason = reasons.includes(message.reason)
         ? message.reason
         : "other";
 
-      const details = String(message.details || "")
+      const details = String(
+        message.details || ""
+      )
         .trim()
         .slice(0, 1000);
 
@@ -828,7 +961,11 @@ wss.on("connection", ws => {
     }
 
     if (message.type === "find-match") {
-      const mode = ["face", "chat", "hunt"].includes(message.mode)
+      const mode = [
+        "face",
+        "chat",
+        "hunt"
+      ].includes(message.mode)
         ? message.mode
         : "face";
 
@@ -852,9 +989,10 @@ wss.on("connection", ws => {
     }
 
     if (message.type === "skip") {
-      const oldMode = ws.roomId
-        ? rooms.get(ws.roomId)?.mode
-        : ws.queueMode;
+      const oldMode =
+        ws.roomId
+          ? rooms.get(ws.roomId)?.mode
+          : ws.queueMode;
 
       endRoom(ws, true);
 
@@ -873,11 +1011,15 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (!ws.roomId) return;
+    if (!ws.roomId) {
+      return;
+    }
 
     const room = rooms.get(ws.roomId);
 
-    if (!room) return;
+    if (!room) {
+      return;
+    }
 
     const opponent =
       room.a === ws
@@ -916,8 +1058,8 @@ wss.on("connection", ws => {
           room.mode === "hunt"
             ? nextHuntTarget(room.usedTargets)
             : room.mode === "face"
-            ? nextUnique(EMOJIS, room.usedTargets)
-            : null;
+              ? nextUnique(EMOJIS, room.usedTargets)
+              : null;
 
         send(room.a, {
           type: "rematch-started",
@@ -934,6 +1076,8 @@ wss.on("connection", ws => {
           mode: room.mode,
           target: room.target
         });
+
+        scheduleHuntTimeout(room);
       }
 
       return;
@@ -943,13 +1087,7 @@ wss.on("connection", ws => {
       message.type === "skip-item" &&
       room.mode === "hunt"
     ) {
-      if (room.target?.emoji !== "🧻") {
-        send(ws, {
-          type: "skip-item-result",
-          ok: false,
-          error: "Skip Item is only available for the toilet paper item."
-        });
-
+      if (room.huntFound) {
         return;
       }
 
@@ -988,6 +1126,8 @@ wss.on("connection", ws => {
           target: room.target,
           skipped: true
         });
+
+        scheduleHuntTimeout(room);
       }
 
       return;
@@ -1029,11 +1169,57 @@ wss.on("connection", ws => {
     }
 
     if (
+      message.type === "hunt-timeout" &&
+      room.mode === "hunt" &&
+      !room.huntFound
+    ) {
+      if (
+        !room.huntStartedAt ||
+        Date.now() - room.huntStartedAt < HUNT_TIMEOUT_MS
+      ) {
+        return;
+      }
+
+      room.huntFound = true;
+
+      if (room.huntTimer) {
+        clearTimeout(room.huntTimer);
+        room.huntTimer = null;
+      }
+
+      send(room.a, {
+        type: "hunt-timeout",
+        round: room.round
+      });
+
+      send(room.b, {
+        type: "hunt-timeout",
+        round: room.round
+      });
+
+      sendNextRound(room);
+
+      return;
+    }
+
+    if (
       message.type === "hunt-found" &&
       room.mode === "hunt" &&
       !room.huntFound
     ) {
+      if (
+        !room.huntStartedAt ||
+        Date.now() - room.huntStartedAt > HUNT_TIMEOUT_MS
+      ) {
+        return;
+      }
+
       room.huntFound = true;
+
+      if (room.huntTimer) {
+        clearTimeout(room.huntTimer);
+        room.huntTimer = null;
+      }
 
       room.scores[ws.playerId] += 1;
 
@@ -1117,8 +1303,7 @@ wss.on("connection", ws => {
     endRoom(ws, true);
 
     for (
-      const [id, invite]
-      of pendingInvites
+      const [id, invite] of pendingInvites
     ) {
       if (
         invite.from === ws.username ||
@@ -1131,8 +1316,7 @@ wss.on("connection", ws => {
     broadcastOnline();
 
     for (
-      const name
-      of ensureSet(friends, ws.username)
+      const name of ensureSet(friends, ws.username)
     ) {
       sendFriends(name);
     }
