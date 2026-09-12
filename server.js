@@ -21,6 +21,7 @@ const friendRequests = new Map();
 const dmHistory = new Map();
 const pendingInvites = new Map();
 
+
 const EMOJIS = [
   "😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇","🙂","🙃","😉","😌","😍","🥰","😘","😗","😙","😚","😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🤩","🥳","🤗","🫠","🫡","🤔","🫢","🫣","🫤","🫥","😐","😑","😶","🫨","😏","😒","🙄","😬","🤥","😶‍🌫️","😴","🤤","😪","😵","😵‍💫","🤐","🤢","🤮","🤧","😷","🤒","🤕","🥴","🥶","🥵","😳","😯","😦","😧","😟","😕","🙁","☹️","😞","😔","😢","😭","😥","😓","😰","😨","😱","😖","😣","😫","😩","🥺","🥹","😠","😡","🤬","😤","😮‍💨","😮","😲","🤯","🤭","🤫","🤠","🥸","😈","👿","💀","☠️","👻","👽","🤖","🎃","😺","😸","😹","😻","😼","😽","🙀","😿","😾"
 ];
@@ -54,21 +55,14 @@ const HUNT_SECONDS = 60;
 const HUNT_TIMEOUT_MS = HUNT_SECONDS * 1000;
 
 app.use(express.static(path.join(__dirname, "public")));
-
-app.get("/health", (_, res) => {
-  res.json({ ok: true, game: "EmojiTV" });
-});
+app.get("/health", (_, res) => res.json({ ok: true, game: "EmojiTV" }));
 
 function send(ws, data) {
-  if (ws && ws.readyState === 1) {
-    ws.send(JSON.stringify(data));
-  }
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(data));
 }
 
 function broadcast(data) {
-  for (const ws of clients) {
-    send(ws, data);
-  }
+  for (const ws of clients) send(ws, data);
 }
 
 function createId() {
@@ -76,20 +70,13 @@ function createId() {
 }
 
 function cleanName(name) {
-  const value = String(name || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, 20);
-
+  const value = String(name || "").trim().replace(/\s+/g, " ").slice(0, 20);
   return value || "Guest";
 }
 
 function removeFromWaiting(ws) {
   const i = waiting.indexOf(ws);
-
-  if (i !== -1) {
-    waiting.splice(i, 1);
-  }
+  if (i !== -1) waiting.splice(i, 1);
 }
 
 function randomItem(list) {
@@ -101,14 +88,9 @@ function modeRounds(mode) {
 }
 
 function nextUnique(list, used) {
-  const available = list.filter(x =>
-    !used.has(typeof x === "string" ? x : x.emoji)
-  );
-
+  const available = list.filter(x => !used.has(typeof x === "string" ? x : x.emoji));
   const pick = randomItem(available.length ? available : list);
-
   used.add(typeof pick === "string" ? pick : pick.emoji);
-
   return pick;
 }
 
@@ -121,10 +103,7 @@ function pairKey(a, b) {
 }
 
 function ensureSet(map, key) {
-  if (!map.has(key)) {
-    map.set(key, new Set());
-  }
-
+  if (!map.has(key)) map.set(key, new Set());
   return map.get(key);
 }
 
@@ -179,9 +158,7 @@ function addDm(a, b, text) {
     createdAt: new Date().toISOString()
   });
 
-  if (h.length > 200) {
-    h.shift();
-  }
+  if (h.length > 200) h.shift();
 
   dmHistory.set(key, h);
 }
@@ -220,9 +197,7 @@ function ensureStats(mode, username) {
 }
 
 function recordCompletedGame(room) {
-  if (!room || room.completed) {
-    return;
-  }
+  if (!room || room.completed) return;
 
   room.completed = true;
 
@@ -279,9 +254,7 @@ function broadcastLeaderboards() {
 function endRoom(ws, notifyOpponent = true) {
   removeFromWaiting(ws);
 
-  if (!ws.roomId) {
-    return null;
-  }
+  if (!ws.roomId) return null;
 
   const roomId = ws.roomId;
   const room = rooms.get(roomId);
@@ -316,13 +289,8 @@ function endRoom(ws, notifyOpponent = true) {
     });
   }
 
-  if (room.a) {
-    room.a.roomId = null;
-  }
-
-  if (room.b) {
-    room.b.roomId = null;
-  }
+  if (room.a) room.a.roomId = null;
+  if (room.b) room.b.roomId = null;
 
   rooms.delete(roomId);
 
@@ -332,9 +300,7 @@ function endRoom(ws, notifyOpponent = true) {
 function putInQueue(ws, mode) {
   removeFromWaiting(ws);
 
-  if (ws.readyState !== 1) {
-    return;
-  }
+  if (ws.readyState !== 1) return;
 
   ws.queueMode = mode;
 
@@ -371,15 +337,10 @@ function scheduleHuntTimeout(room) {
 
   room.huntStartedAt = Date.now();
 
-  if (room.mode !== "hunt") {
-    return;
-  }
+  if (room.mode !== "hunt") return;
 
   room.huntTimer = setTimeout(() => {
-    if (
-      rooms.get(room.id) !== room ||
-      room.huntFound
-    ) {
+    if (rooms.get(room.id) !== room || room.huntFound) {
       return;
     }
 
@@ -488,6 +449,11 @@ function sendNextRound(room) {
       finalScores: room.scores
     });
 
+    if (room.huntTimer) {
+      clearTimeout(room.huntTimer);
+      room.huntTimer = null;
+    }
+
     return;
   }
 
@@ -518,12 +484,13 @@ function sendNextRound(room) {
 }
 
 wss.on("connection", ws => {
-  ws.playerId = createId();
-  ws.username = `Guest-${ws.playerId.slice(0, 4)}`;
-  ws.roomId = null;
-  ws.queueMode = null;
-
   clients.add(ws);
+
+  ws.playerId = createId();
+  ws.roomId = null;
+  ws.role = null;
+  ws.queueMode = null;
+  ws.username = "Guest";
 
   send(ws, {
     type: "ready",
@@ -531,6 +498,7 @@ wss.on("connection", ws => {
     username: ws.username
   });
 
+  send(ws, onlinePayload());
   broadcastOnline();
 
   ws.on("message", raw => {
@@ -542,49 +510,34 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (!message || typeof message !== "object") {
-      return;
-    }
-
     if (message.type === "set-username") {
-      const newName = cleanName(message.username);
+      const oldName = ws.username;
 
-      const taken = [...clients].some(
-        c => c !== ws && c.username.toLowerCase() === newName.toLowerCase()
-      );
-
-      if (taken) {
-        send(ws, {
-          type: "username-saved",
-          username: ws.username,
-          error: "That username is already being used."
-        });
-
-        return;
-      }
-
-      ws.username = newName;
+      ws.username = cleanName(message.username);
 
       send(ws, {
         type: "username-saved",
         username: ws.username
       });
 
-      broadcastOnline();
+      if (oldName !== ws.username) {
+        broadcastOnline();
+        sendFriends(oldName);
+        sendFriends(ws.username);
+      }
+
       return;
     }
 
     if (message.type === "get-friends") {
-      sendFriends(ws.username);
+      send(ws, friendPayload(ws.username));
       return;
     }
 
     if (message.type === "friend-request") {
       const to = cleanName(message.to);
 
-      if (!to || to === ws.username) {
-        return;
-      }
+      if (!to || to === ws.username) return;
 
       const target = [...clients].find(
         c => c.username === to
@@ -652,17 +605,11 @@ wss.on("connection", ws => {
     if (message.type === "friend-invite") {
       const to = cleanName(message.to);
 
-      const mode = [
-        "face",
-        "chat",
-        "hunt"
-      ].includes(message.mode)
+      const mode = ["face", "chat", "hunt"].includes(message.mode)
         ? message.mode
         : "face";
 
-      if (!to || to === ws.username) {
-        return;
-      }
+      if (!to || to === ws.username) return;
 
       if (!isFriend(ws.username, to)) {
         send(ws, {
@@ -735,6 +682,7 @@ wss.on("connection", ws => {
 
     if (message.type === "decline-invite") {
       const id = String(message.inviteId || "");
+
       const invite = pendingInvites.get(id);
 
       if (!invite || invite.to !== ws.username) {
@@ -759,12 +707,10 @@ wss.on("connection", ws => {
 
     if (message.type === "accept-invite") {
       const id = String(message.inviteId || "");
+
       const invite = pendingInvites.get(id);
 
-      if (
-        !invite ||
-        invite.to !== ws.username
-      ) {
+      if (!invite || invite.to !== ws.username) {
         send(ws, {
           type: "invite-result",
           ok: false,
@@ -788,11 +734,7 @@ wss.on("connection", ws => {
         c => c.username === invite.from
       );
 
-      if (
-        !sender ||
-        sender.roomId ||
-        sender.queueMode
-      ) {
+      if (!sender || sender.roomId || sender.queueMode) {
         pendingInvites.delete(id);
 
         send(ws, {
@@ -807,6 +749,7 @@ wss.on("connection", ws => {
       pendingInvites.delete(id);
 
       startMatch(sender, ws, invite.mode);
+
       broadcastOnline();
 
       return;
@@ -818,12 +761,7 @@ wss.on("connection", ws => {
         .trim()
         .slice(0, 300);
 
-      if (
-        !text ||
-        !isFriend(ws.username, to)
-      ) {
-        return;
-      }
+      if (!text || !isFriend(ws.username, to)) return;
 
       addDm(ws.username, to, text);
 
@@ -862,11 +800,7 @@ wss.on("connection", ws => {
     }
 
     if (message.type === "get-leaderboards") {
-      for (const mode of [
-        "face",
-        "hunt",
-        "chat"
-      ]) {
+      for (const mode of ["face", "hunt", "chat"]) {
         send(ws, leaderboardPayload(mode));
       }
 
@@ -874,11 +808,7 @@ wss.on("connection", ws => {
     }
 
     if (message.type === "report") {
-      const allowedModes = [
-        "face",
-        "chat",
-        "hunt"
-      ];
+      const allowedModes = ["face", "chat", "hunt"];
 
       const reasons = [
         "harassment",
@@ -913,17 +843,13 @@ wss.on("connection", ws => {
           ? room.b
           : room.a;
 
-      if (!opponent) {
-        return;
-      }
+      if (!opponent) return;
 
       const reason = reasons.includes(message.reason)
         ? message.reason
         : "other";
 
-      const details = String(
-        message.details || ""
-      )
+      const details = String(message.details || "")
         .trim()
         .slice(0, 1000);
 
@@ -931,10 +857,13 @@ wss.on("connection", ws => {
         id: createId(),
         createdAt: new Date().toISOString(),
         mode,
+
         reporterId: ws.playerId,
         reporterUsername: ws.username,
+
         reportedId: opponent.playerId,
         reportedUsername: opponent.username,
+
         roomId: room.id,
         reason,
         details
@@ -961,11 +890,9 @@ wss.on("connection", ws => {
     }
 
     if (message.type === "find-match") {
-      const mode = [
-        "face",
-        "chat",
-        "hunt"
-      ].includes(message.mode)
+      const mode = ["face", "chat", "hunt"].includes(
+        message.mode
+      )
         ? message.mode
         : "face";
 
@@ -989,10 +916,9 @@ wss.on("connection", ws => {
     }
 
     if (message.type === "skip") {
-      const oldMode =
-        ws.roomId
-          ? rooms.get(ws.roomId)?.mode
-          : ws.queueMode;
+      const oldMode = ws.roomId
+        ? rooms.get(ws.roomId)?.mode
+        : ws.queueMode;
 
       endRoom(ws, true);
 
@@ -1011,15 +937,11 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (!ws.roomId) {
-      return;
-    }
+    if (!ws.roomId) return;
 
     const room = rooms.get(ws.roomId);
 
-    if (!room) {
-      return;
-    }
+    if (!room) return;
 
     const opponent =
       room.a === ws
@@ -1041,6 +963,7 @@ wss.on("connection", ws => {
 
       if (room.rematchReady.size === 2) {
         room.rematchReady.clear();
+
         room.completed = false;
         room.round = 1;
 
@@ -1087,9 +1010,7 @@ wss.on("connection", ws => {
       message.type === "skip-item" &&
       room.mode === "hunt"
     ) {
-      if (room.huntFound) {
-        return;
-      }
+      if (room.huntFound) return;
 
       room.skipReady.add(ws.playerId);
 
@@ -1105,8 +1026,10 @@ wss.on("connection", ws => {
 
       if (room.skipReady.size === 2) {
         room.skipReady.clear();
+
         room.huntFound = false;
         room.roundScores = {};
+
         room.target = nextHuntTarget(room.usedTargets);
 
         send(room.a, {
@@ -1139,10 +1062,7 @@ wss.on("connection", ws => {
     ) {
       const score = Math.max(
         0,
-        Math.min(
-          100,
-          Number(message.score) || 0
-        )
+        Math.min(100, Number(message.score) || 0)
       );
 
       room.roundScores[ws.playerId] = score;
@@ -1263,9 +1183,8 @@ wss.on("connection", ws => {
       message.type === "chat-message" &&
       room.mode === "chat"
     ) {
-      const text = String(
-        message.text || ""
-      ).slice(0, 300);
+      const text = String(message.text || "")
+        .slice(0, 300);
 
       if (text) {
         send(opponent, {
@@ -1283,10 +1202,7 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (
-      message.type === "signal" &&
-      opponent
-    ) {
+    if (message.type === "signal" && opponent) {
       send(opponent, {
         type: "signal",
         signal: message.signal,
@@ -1302,9 +1218,7 @@ wss.on("connection", ws => {
 
     endRoom(ws, true);
 
-    for (
-      const [id, invite] of pendingInvites
-    ) {
+    for (const [id, invite] of pendingInvites) {
       if (
         invite.from === ws.username ||
         invite.to === ws.username
@@ -1315,9 +1229,7 @@ wss.on("connection", ws => {
 
     broadcastOnline();
 
-    for (
-      const name of ensureSet(friends, ws.username)
-    ) {
+    for (const name of ensureSet(friends, ws.username)) {
       sendFriends(name);
     }
   });
