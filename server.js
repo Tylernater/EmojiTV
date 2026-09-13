@@ -10,6 +10,8 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
+const PORT = process.env.PORT || 3000;
+
 const waiting = [];
 const rooms = new Map();
 const clients = new Set();
@@ -29,6 +31,8 @@ const friends = new Map();
 const friendRequests = new Map();
 const dmHistory = new Map();
 const pendingInvites = new Map();
+
+const sessions = new Map();
 
 const profiles = new Map();
 
@@ -88,1055 +92,333 @@ const EMOJIS = [
   "🤤","😪","😵","😵‍💫","🤐","🤢","🤮","🤧","😷","🤒",
   "🤕","🥴","🥶","🥵","😳","😯","😦","😧","😟","😕",
   "🙁","☹️","😞","😔","😢","😭","😥","😓","😰","😨",
-  "😱","😖","😣","😫","😩","🥺","🥹","😠","😡","🤬",
-  "😤","😮‍💨","😮","😲","🤯","🤭","🤫","🤠","🥸","😈",
-  "👿","💀","☠️","👻","👽","🤖","🎃","😺","😸","😹",
-  "😻","😼","😽","🙀","😿","😾"
+  "😱","😖","😣","😩","🥺","🥹","😤","😠","😡","🤬",
+  "🤯","😮","😲","😵‍💫","😱","🤔","🤫","🤭","🫢","🫣"
+];
+
+const POSES = [
+  "🕺",
+  "🙆‍♂️",
+  "🙋‍♂️",
+  "💪",
+  "🧍‍♂️",
+  "🤸"
 ];
 
 const HUNT_ITEMS = [
-  {
-    emoji: "🧻",
-    label: "toilet paper",
-    aliases: ["toilet paper", "a roll of toilet paper"]
-  },
-  {
-    emoji: "🍎",
-    label: "apple",
-    aliases: ["an apple", "a red apple", "apple"]
-  },
-  {
-    emoji: "🍌",
-    label: "banana",
-    aliases: ["a banana", "banana"]
-  },
-  {
-    emoji: "🥤",
-    label: "cup",
-    aliases: ["a cup", "a drinking cup", "plastic cup"]
-  },
-  {
-    emoji: "🧴",
-    label: "bottle",
-    aliases: ["a bottle", "a plastic bottle", "water bottle"]
-  },
-  {
-    emoji: "📕",
-    label: "book",
-    aliases: ["a book", "a red book"]
-  },
-  {
-    emoji: "🥄",
-    label: "spoon",
-    aliases: ["a spoon", "a metal spoon"]
-  },
-  {
-    emoji: "🧸",
-    label: "teddy bear",
-    aliases: ["a teddy bear", "a stuffed bear", "stuffed animal"]
-  },
-  {
-    emoji: "📱",
-    label: "cell phone",
-    aliases: ["a cell phone", "a smartphone", "a phone"]
-  },
-  {
-    emoji: "🪥",
-    label: "toothbrush",
-    aliases: ["a toothbrush", "toothbrush"]
-  },
-  {
-    emoji: "🎧",
-    label: "headphones",
-    aliases: ["headphones", "a pair of headphones"]
-  },
-  {
-    emoji: "🕶️",
-    label: "sunglasses",
-    aliases: ["sunglasses", "a pair of sunglasses"]
-  },
-  {
-    emoji: "⚽",
-    label: "soccer ball",
-    aliases: ["a soccer ball", "soccer ball"]
-  },
-  {
-    emoji: "🏀",
-    label: "basketball",
-    aliases: ["a basketball", "basketball"]
-  },
-  {
-    emoji: "🎮",
-    label: "game controller",
-    aliases: ["a game controller", "controller"]
-  },
-  {
-    emoji: "⌚",
-    label: "watch",
-    aliases: ["a watch", "smartwatch"]
-  },
-  {
-    emoji: "✏️",
-    label: "pencil",
-    aliases: ["a pencil", "pencil"]
-  },
-  {
-    emoji: "🖊️",
-    label: "pen",
-    aliases: ["a pen", "pen"]
-  },
-  {
-    emoji: "🧢",
-    label: "cap",
-    aliases: ["a cap", "a baseball cap", "hat"]
-  },
-  {
-    emoji: "👟",
-    label: "shoe",
-    aliases: ["a shoe", "sneaker"]
-  }
+  "phone",
+  "cup",
+  "bottle",
+  "book",
+  "headphones",
+  "keyboard",
+  "mouse",
+  "backpack",
+  "hat",
+  "shoe",
+  "pillow",
+  "chair",
+  "controller",
+  "plant",
+  "lamp",
+  "glasses",
+  "remote",
+  "water bottle",
+  "stuffed animal",
+  "ball"
 ];
 
-const TOTAL_FACE_ROUNDS = 5;
-const TOTAL_POSE_ROUNDS = 5;
-const TOTAL_LAUGH_ROUNDS = 3;
-const TOTAL_HUNT_ROUNDS = 10;
+const LAUGH_ROUNDS = 3;
+const POSE_ROUNDS = 5;
+const FACE_ROUNDS = 5;
+const HUNT_ROUNDS = 5;
 
-const LAUGH_TIMEOUT_MS = 30000;
+function safeSend(ws, payload) {
+  if (!ws) return;
 
-const HUNT_SECONDS = 60;
-const HUNT_TIMEOUT_MS = HUNT_SECONDS * 1000;
-
-app.use(
-  express.static(
-    path.join(__dirname, "public")
-  )
-);
-
-app.get("/health", (_, res) => {
-  res.json({
-    ok: true,
-    game: "EmojiTV"
-  });
-});
-
-function send(ws, data) {
-  if (
-    ws &&
-    ws.readyState === 1
-  ) {
-    ws.send(
-      JSON.stringify(data)
-    );
-  }
+  try {
+    if (ws.readyState === 1) {
+      ws.send(JSON.stringify(payload));
+    }
+  } catch {}
 }
 
-function broadcast(data) {
+function send(username, payload) {
   for (const ws of clients) {
-    send(ws, data);
+    if (ws.username === username) {
+      safeSend(ws, payload);
+    }
   }
 }
 
-function createId() {
-  return crypto.randomUUID();
+function broadcast(payload) {
+  for (const ws of clients) {
+    safeSend(ws, payload);
+  }
 }
 
-function cleanName(name) {
-  const value = String(
-    name || ""
-  )
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, 20);
+function getClientByPlayerId(playerId) {
+  for (const ws of clients) {
+    if (ws.__playerId === playerId) return ws;
+  }
+  return null;
+}
 
-  return value || "Guest";
+function getRoomPlayer(room, playerId) {
+  if (!room) return null;
+  if (room.a?.playerId === playerId) return room.a;
+  if (room.b?.playerId === playerId) return room.b;
+  return null;
+}
+
+function otherPlayer(room, playerId) {
+  if (!room) return null;
+  if (room.a?.playerId === playerId) return room.b;
+  if (room.b?.playerId === playerId) return room.a;
+  return null;
+}
+
+function roomHasPlayer(room, playerId) {
+  return !!getRoomPlayer(room, playerId);
 }
 
 function removeFromWaiting(ws) {
-  const i =
-    waiting.indexOf(ws);
-
-  if (i !== -1) {
-    waiting.splice(i, 1);
-  }
+  const index = waiting.indexOf(ws);
+  if (index !== -1) waiting.splice(index, 1);
 }
 
-function randomItem(list) {
-  return list[
-    Math.floor(
-      Math.random() *
-      list.length
-    )
-  ];
+function modeName(mode) {
+  if (mode === "face") return "Face-Off";
+  if (mode === "hunt") return "Emoji Hunt";
+  if (mode === "chat") return "Video Chat";
+  if (mode === "pose") return "Copy the Pose";
+  if (mode === "laugh") return "Make Them Laugh";
+  return mode;
 }
 
-function modeRounds(mode) {
-  if (mode === "hunt") {
-    return TOTAL_HUNT_ROUNDS;
-  }
-
-  if (mode === "laugh") {
-    return TOTAL_LAUGH_ROUNDS;
-  }
-
-  if (mode === "pose") {
-    return TOTAL_POSE_ROUNDS;
-  }
-
-  return TOTAL_FACE_ROUNDS;
+function randomEmoji() {
+  return EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
 }
 
-function nextUnique(
-  list,
-  used
-) {
-  const available =
-    list.filter(item => {
-      const key =
-        typeof item === "string"
-          ? item
-          : item.emoji;
+function randomPose() {
+  return POSES[Math.floor(Math.random() * POSES.length)];
+}
 
-      return !used.has(key);
+function randomHuntItem() {
+  return HUNT_ITEMS[Math.floor(Math.random() * HUNT_ITEMS.length)];
+}
+
+function ensureFriends(username) {
+  if (!friends.has(username)) {
+    friends.set(username, new Set());
+  }
+  return friends.get(username);
+}
+
+function ensureRequests(username) {
+  if (!friendRequests.has(username)) {
+    friendRequests.set(username, new Set());
+  }
+  return friendRequests.get(username);
+}
+
+function ensureProfile(username) {
+  if (!profiles.has(username)) {
+    profiles.set(username, {
+      username,
+      xp: 0,
+      level: 1,
+      gamesPlayed: 0,
+      wins: 0,
+      streak: 0,
+      bestStreak: 0,
+      badges: new Set(),
+      daily: {
+        date: new Date().toISOString().slice(0, 10),
+        challenges: [],
+        progress: {},
+        completed: []
+      }
     });
-
-  const pick = randomItem(
-    available.length
-      ? available
-      : list
-  );
-
-  const key =
-    typeof pick === "string"
-      ? pick
-      : pick.emoji;
-
-  used.add(key);
-
-  return pick;
-}
-
-function nextHuntTarget(
-  used
-) {
-  return {
-    ...nextUnique(
-      HUNT_ITEMS,
-      used
-    )
-  };
-}
-
-function pairKey(a, b) {
-  return [
-    a,
-    b
-  ]
-    .sort()
-    .join("\u0000");
-}
-
-function ensureSet(
-  map,
-  key
-) {
-  if (!map.has(key)) {
-    map.set(
-      key,
-      new Set()
-    );
   }
 
-  return map.get(key);
+  const p = profiles.get(username);
+
+  resetDailyIfNeeded(p);
+
+  return p;
 }
 
-function isFriend(a, b) {
-  return ensureSet(
-    friends,
-    a
-  ).has(b);
-}
+function resetDailyIfNeeded(profile) {
+  const today = new Date().toISOString().slice(0, 10);
 
-function friendPayload(
-  username
-) {
-  const list = [
-    ...ensureSet(
-      friends,
-      username
-    )
-  ];
+  if (profile.daily?.date === today) return;
 
-  const pending = [
-    ...ensureSet(
-      friendRequests,
-      username
-    )
-  ];
-
-  return {
-    type: "friends",
-
-    friends:
-      list.map(name => ({
-        username: name,
-
-        online:
-          [...clients].some(
-            c =>
-              c.username ===
-              name
-          )
-      })),
-
-    pending
+  profile.daily = {
+    date: today,
+    challenges: [],
+    progress: {},
+    completed: []
   };
 }
 
-function sendFriends(
-  username
-) {
-  for (const c of clients) {
-    if (
-      c.username ===
-      username
-    ) {
-      send(
-        c,
-        friendPayload(
-          username
-        )
-      );
+function getDailyChallenges(profile) {
+  if (!profile.daily.challenges.length) {
+    const shuffled = [...DAILY_CHALLENGES].sort(() => Math.random() - 0.5);
+
+    profile.daily.challenges = shuffled
+      .slice(0, 3)
+      .map(c => ({ ...c }));
+
+    for (const c of profile.daily.challenges) {
+      profile.daily.progress[c.id] = 0;
     }
   }
+
+  return profile.daily.challenges.map(c => ({
+    ...c,
+    progress: profile.daily.progress[c.id] || 0,
+    completed: profile.daily.completed.includes(c.id)
+  }));
 }
 
-function sendDmHistory(
-  a,
-  b
-) {
-  const history =
-    dmHistory.get(
-      pairKey(a, b)
-    ) || [];
+function addXp(profile, amount) {
+  profile.xp += Math.max(0, amount);
 
-  for (const c of clients) {
-    if (
-      c.username === a
-    ) {
-      send(c, {
-        type:
-          "dm-history",
-        with: b,
-        messages:
-          history.slice(
-            -100
-          )
+  profile.level =
+    Math.floor(profile.xp / XP_PER_LEVEL) + 1;
+}
+
+function updateDaily(username, event, amount = 1) {
+  const p = ensureProfile(username);
+  const challenges = getDailyChallenges(p);
+
+  let changed = false;
+
+  for (const c of challenges) {
+    if (c.event !== event) continue;
+    if (p.daily.completed.includes(c.id)) continue;
+
+    const current = p.daily.progress[c.id] || 0;
+
+    const next =
+      event === "streak"
+        ? Math.max(current, amount)
+        : current + amount;
+
+    p.daily.progress[c.id] =
+      Math.min(c.target, next);
+
+    changed = true;
+
+    if (p.daily.progress[c.id] >= c.target) {
+      p.daily.completed.push(c.id);
+
+      addXp(p, c.reward);
+
+      send(p.username, {
+        type: "daily-complete",
+        challengeId: c.id,
+        title: c.title,
+        reward: c.reward
       });
     }
   }
+
+  return changed;
 }
 
-function addDm(
-  a,
-  b,
-  text
-) {
-  const key =
-    pairKey(a, b);
-
-  const history =
-    dmHistory.get(key) ||
-    [];
-
-  history.push({
-    from: a,
-    to: b,
-    text,
-
-    createdAt:
-      new Date().toISOString()
-  });
-
-  if (
-    history.length > 200
-  ) {
-    history.shift();
+function badgeCheck(profile) {
+  if (profile.gamesPlayed >= 1) {
+    profile.badges.add("first-win");
   }
 
-  dmHistory.set(
-    key,
-    history
-  );
-}
+  if (profile.bestStreak >= 5) {
+    profile.badges.add("streak-5");
+  }
 
-function onlinePayload() {
-  const names =
-    [...clients]
-      .map(
-        ws =>
-          ws.username ||
-          "Guest"
-      )
-      .sort((a, b) =>
-        a.localeCompare(b)
-      );
+  if (profile.bestStreak >= 10) {
+    profile.badges.add("streak-10");
+  }
 
-  return {
-    type:
-      "online-list",
+  if (profile.gamesPlayed >= 100) {
+    profile.badges.add("games-100");
+  }
 
-    count:
-      clients.size,
-
-    names
-  };
-}
-
-function broadcastOnline() {
-  broadcast(
-    onlinePayload()
-  );
-
-  for (const c of clients) {
-    sendFriends(
-      c.username
-    );
+  if (ensureFriends(profile.username).size >= 10) {
+    profile.badges.add("friends-10");
   }
 }
 
-function todayKey() {
-  return new Date()
-    .toISOString()
-    .slice(0, 10);
-}
+function profilePayload(username) {
+  const p = ensureProfile(username);
 
-function challengeSetForToday() {
-  const day =
-    Math.floor(
-      Date.parse(
-        todayKey() +
-        "T00:00:00Z"
-      ) / 86400000
-    );
-
-  return [
-    0,
-    1,
-    2
-  ].map(
-    i =>
-      DAILY_CHALLENGES[
-        (day + i) %
-        DAILY_CHALLENGES.length
-      ]
-  );
-}
-
-function ensureProfile(
-  username
-) {
-  if (
-    !profiles.has(username)
-  ) {
-    profiles.set(
-      username,
-      {
-        username,
-        xp: 0,
-        level: 1,
-        streak: 0,
-        bestStreak: 0,
-        gamesPlayed: 0,
-        wins: 0,
-
-        badges:
-          new Set(),
-
-        daily: {
-          date:
-            todayKey(),
-
-          progress: {},
-
-          completed: []
-        }
-      }
-    );
-  }
-
-  const profile =
-    profiles.get(
-      username
-    );
-
-  if (
-    profile.daily.date !==
-    todayKey()
-  ) {
-    profile.daily = {
-      date:
-        todayKey(),
-
-      progress: {},
-
-      completed: []
-    };
-  }
-
-  profile.level =
-    Math.floor(
-      profile.xp /
-      XP_PER_LEVEL
-    ) + 1;
-
-  return profile;
-}
-
-function addXp(
-  profile,
-  amount
-) {
-  profile.xp += Math.max(
-    0,
-    Math.round(amount)
-  );
-
-  profile.level =
-    Math.floor(
-      profile.xp /
-      XP_PER_LEVEL
-    ) + 1;
-}
-
-function ensureStats(
-  mode,
-  username
-) {
-  if (
-    !leaderboard[mode].has(
-      username
-    )
-  ) {
-    leaderboard[mode].set(
-      username,
-      {
-        username,
-        wins: 0,
-        points: 0,
-        games: 0
-      }
-    );
-  }
-
-  return leaderboard[
-    mode
-  ].get(username);
-}
-
-function dailyPayload(
-  username
-) {
-  const profile =
-    ensureProfile(
-      username
-    );
-
-  const defs =
-    challengeSetForToday();
-
-  return {
-    date:
-      profile.daily.date,
-
-    challenges:
-      defs.map(
-        challenge => ({
-          ...challenge,
-
-          progress:
-            Math.min(
-              challenge.target,
-              Number(
-                profile.daily
-                  .progress[
-                  challenge.id
-                ] || 0
-              )
-            ),
-
-          completed:
-            profile.daily
-              .completed
-              .includes(
-                challenge.id
-              )
-        })
-      )
-  };
-}
-
-function profilePayload(
-  username
-) {
-  const p =
-    ensureProfile(
-      username
-    );
+  const xpIntoLevel =
+    p.xp % XP_PER_LEVEL;
 
   return {
     type: "profile",
-
-    username:
-      p.username,
-
+    username: p.username,
     xp: p.xp,
-
-    level:
-      p.level,
-
-    xpIntoLevel:
-      p.xp %
-      XP_PER_LEVEL,
-
+    level: p.level,
+    xpIntoLevel,
     xpToNextLevel:
-      XP_PER_LEVEL -
-      (p.xp %
-        XP_PER_LEVEL),
-
-    streak:
-      p.streak,
-
-    bestStreak:
-      p.bestStreak,
-
-    gamesPlayed:
-      p.gamesPlayed,
-
-    wins:
-      p.wins,
-
-    badges:
-      [...p.badges],
-
-    daily:
-      dailyPayload(
-        username
-      )
+      XP_PER_LEVEL - xpIntoLevel,
+    gamesPlayed: p.gamesPlayed,
+    wins: p.wins,
+    streak: p.streak,
+    bestStreak: p.bestStreak,
+    badges: [...p.badges],
+    daily: {
+      date: p.daily.date,
+      challenges: getDailyChallenges(p)
+    }
   };
 }
 
-function sendProfile(
-  username
-) {
-  for (const c of clients) {
-    if (
-      c.username ===
-      username
-    ) {
-      send(
-        c,
-        profilePayload(
-          username
-        )
-      );
-    }
-  }
+function sendProfile(username) {
+  send(username, profilePayload(username));
 }
 
-function badgeCheck(
-  profile
-) {
-  const earned =
-    new Set(
-      profile.badges
-    );
-
-  if (
-    profile.wins >= 1
-  ) {
-    earned.add(
-      "first-win"
-    );
-  }
-
-  if (
-    profile.bestStreak >= 5
-  ) {
-    earned.add(
-      "streak-5"
-    );
-  }
-
-  if (
-    profile.bestStreak >= 10
-  ) {
-    earned.add(
-      "streak-10"
-    );
-  }
-
-  if (
-    profile.gamesPlayed >=
-    100
-  ) {
-    earned.add(
-      "games-100"
-    );
-  }
-
-  const hunt =
-    leaderboard.hunt.get(
-      profile.username
-    );
-
-  if (
-    hunt &&
-    hunt.wins >= 1
-  ) {
-    earned.add(
-      "hunt-master"
-    );
-  }
-
-  if (
-    ensureSet(
-      friends,
-      profile.username
-    ).size >= 10
-  ) {
-    earned.add(
-      "friends-10"
-    );
-  }
-
-  profile.badges =
-    earned;
-}
-
-function updateDaily(
-  username,
-  event,
-  amount = 1
-) {
-  const p =
-    ensureProfile(
-      username
-    );
-
-  const defs =
-    challengeSetForToday();
-
-  for (const c of defs) {
-    if (
-      c.event !== event ||
-      p.daily.completed.includes(
-        c.id
-      )
-    ) {
-      continue;
-    }
-
-    const current =
-      Number(
-        p.daily.progress[
-          c.id
-        ] || 0
-      );
-
-    const next =
-      c.event === "streak"
-        ? Math.max(
-            current,
-            amount
-          )
-        : current + amount;
-
-    p.daily.progress[
-      c.id
-    ] = Math.min(
-      c.target,
-      next
-    );
-
-    if (
-      p.daily.progress[
-        c.id
-      ] >= c.target
-    ) {
-      p.daily.completed.push(
-        c.id
-      );
-
-      addXp(
-        p,
-        c.reward
-      );
-
-      send(
-        [...clients].find(
-          client =>
-            client.username ===
-            p.username
-        ),
-        {
-          type:
-            "daily-complete",
-
-          challengeId:
-            c.id,
-
-          title:
-            c.title,
-
-          reward:
-            c.reward
-        }
-      );
-    }
-  }
-}
-
-function updateProfileAndSend(
-  username
-) {
-  const p =
-    ensureProfile(
-      username
-    );
+function updateProfileAndSend(username) {
+  const p = ensureProfile(username);
 
   badgeCheck(p);
 
-  sendProfile(
-    username
-  );
+  sendProfile(username);
 }
 
-function leaderboardPayload(
-  mode
-) {
-  const rows =
-    [
-      ...leaderboard[
-        mode
-      ].values()
-    ]
-      .sort((a, b) => {
-        if (
-          b.wins !==
-          a.wins
-        ) {
-          return (
-            b.wins -
-            a.wins
-          );
-        }
+function ensureStats(mode, username) {
+  if (!leaderboard[mode]) {
+    leaderboard[mode] = new Map();
+  }
 
-        if (
-          b.points !==
-          a.points
-        ) {
-          return (
-            b.points -
-            a.points
-          );
-        }
+  if (!leaderboard[mode].has(username)) {
+    leaderboard[mode].set(username, {
+      username,
+      wins: 0,
+      games: 0,
+      points: 0
+    });
+  }
 
-        return a.username.localeCompare(
-          b.username
-        );
-      })
-      .slice(0, 20)
-      .map(
-        (row, index) => ({
-          rank:
-            index + 1,
-
-          username:
-            row.username,
-
-          wins:
-            row.wins,
-
-          points:
-            row.points,
-
-          games:
-            row.games
-        })
-      );
-
-  return {
-    type:
-      "leaderboard",
-
-    mode,
-
-    rows
-  };
+  return leaderboard[mode].get(username);
 }
 
-function xpLeaderboardPayload() {
-  const rows =
-    [...profiles.values()]
-      .sort((a, b) => {
-        if (
-          b.xp !== a.xp
-        ) {
-          return (
-            b.xp -
-            a.xp
-          );
-        }
+function applyGameResult(room) {
+  if (!room || room.completed) return null;
 
-        if (
-          b.level !==
-          a.level
-        ) {
-          return (
-            b.level -
-            a.level
-          );
-        }
+  room.completed = true;
 
-        if (
-          b.wins !==
-          a.wins
-        ) {
-          return (
-            b.wins -
-            a.wins
-          );
-        }
+  const players = [room.a, room.b];
 
-        return a.username.localeCompare(
-          b.username
-        );
-      })
-      .slice(0, 20)
-      .map(
-        (profile, index) => ({
-          rank:
-            index + 1,
-
-          username:
-            profile.username,
-
-          xp:
-            profile.xp,
-
-          level:
-            profile.level,
-
-          streak:
-            profile.streak
-        })
-      );
-
-  return {
-    type:
-      "leaderboard",
-
-    mode:
-      "xp",
-
-    rows
-  };
-}
-
-function broadcastLeaderboards() {
-  for (
-    const mode of [
-      "face",
-      "hunt",
-      "chat",
-      "pose",
-      "laugh"
-    ]
-  ) {
-    broadcast(
-      leaderboardPayload(
-        mode
-      )
-    );
-  }
-
-  broadcast(
-    xpLeaderboardPayload()
-  );
-}
-
-function awardGameXp(
-  profile,
-  mode,
-  score,
-  won
-) {
-  let xp = 50;
-
-  if (won) {
-    xp += 100;
-  }
-
-  if (
-    mode === "face" ||
-    mode === "pose"
-  ) {
-    xp += Math.round(
-      score * 0.5
-    );
-  }
-
-  if (
-    mode === "hunt"
-  ) {
-    xp +=
-      score * 10;
-  }
-
-  if (
-    mode === "laugh"
-  ) {
-    xp +=
-      score * 25;
-  }
-
-  addXp(
-    profile,
-    xp
-  );
-}
-
-function applyGameResult(
-  room
-) {
-  if (
-    !room ||
-    room.completed
-  ) {
-    return null;
-  }
-
-  room.completed =
-    true;
-
-  const players = [
-    room.a,
-    room.b
-  ];
-
-  const scores =
-    room.scores;
+  const scores = room.scores;
 
   const aScore =
-    scores[
-      room.a.playerId
-    ] || 0;
+    scores[room.a.playerId] || 0;
 
   const bScore =
-    scores[
-      room.b.playerId
-    ] || 0;
+    scores[room.b.playerId] || 0;
 
   const winnerIds =
     aScore === bScore
@@ -1147,68 +429,75 @@ function applyGameResult(
             : room.b.playerId
         ]);
 
-  for (
-    const player of players
-  ) {
+  for (const player of players) {
     const stats =
-      ensureStats(
-        room.mode,
-        player.username
-      );
-
-    const playerScore =
-      scores[
-        player.playerId
-      ] || 0;
+      ensureStats(room.mode, player.username);
 
     stats.games += 1;
 
     stats.points +=
-      playerScore;
+      scores[player.playerId] || 0;
 
-    const profile =
-      ensureProfile(
-        player.username
-      );
+    const p =
+      ensureProfile(player.username);
 
-    profile.gamesPlayed +=
-      1;
+    p.gamesPlayed += 1;
 
     const won =
-      winnerIds.has(
-        player.playerId
-      );
+      winnerIds.has(player.playerId);
 
     if (won) {
       stats.wins += 1;
 
-      profile.wins += 1;
+      p.wins += 1;
 
-      profile.streak += 1;
+      p.streak += 1;
 
-      profile.bestStreak =
+      p.bestStreak =
         Math.max(
-          profile.bestStreak,
-          profile.streak
+          p.bestStreak,
+          p.streak
         );
-
-      updateDaily(
-        player.username,
-        "win",
-        1
-      );
-
-      updateDaily(
-        player.username,
-        "streak",
-        profile.streak
-      );
-    } else if (
-      room.mode !==
-      "chat"
-    ) {
-      profile.streak = 0;
+    } else if (room.mode !== "chat") {
+      p.streak = 0;
     }
+
+    let xp =
+      room.mode === "chat"
+        ? 25
+        : 30;
+
+    if (won) xp += 100;
+
+    if (room.mode === "face") {
+      xp += Math.min(
+        50,
+        Math.floor(
+          (scores[player.playerId] || 0) / 10
+        )
+      );
+    }
+
+    if (room.mode === "hunt") {
+      xp +=
+        (scores[player.playerId] || 0) * 10;
+    }
+
+    if (room.mode === "pose") {
+      xp += Math.min(
+        50,
+        Math.floor(
+          (scores[player.playerId] || 0) / 10
+        )
+      );
+    }
+
+    if (room.mode === "laugh") {
+      xp +=
+        (scores[player.playerId] || 0) * 40;
+    }
+
+    addXp(p, xp);
 
     updateDaily(
       player.username,
@@ -1216,61 +505,57 @@ function applyGameResult(
       1
     );
 
-    if (
-      room.mode ===
-      "hunt"
-    ) {
+    if (won) {
       updateDaily(
         player.username,
-        "hunt",
-        playerScore
+        "win",
+        1
       );
     }
 
     if (
-      room.mode ===
-      "face"
+      room.mode === "face" &&
+      (room.bestFaceRound?.[player.playerId] || 0) >= 80
     ) {
-      const bestRound =
-        room.bestFaceRound?.[
-          player.playerId
-        ] || 0;
-
-      if (
-        bestRound >= 80
-      ) {
-        updateDaily(
-          player.username,
-          "score80",
-          1
-        );
-      }
+      updateDaily(
+        player.username,
+        "score80",
+        1
+      );
     }
 
-    awardGameXp(
-      profile,
-      room.mode,
-      playerScore,
-      won
-    );
-
     if (
-      room.mode ===
-        "face" &&
-      room.perfectFace?.[
-        player.playerId
-      ] === true
+      room.mode === "face" &&
+      room.perfectFace?.[player.playerId]
     ) {
-      profile.badges.add(
+      ensureProfile(
+        player.username
+      ).badges.add(
         "perfect-face"
       );
     }
 
-    badgeCheck(
-      profile
-    );
+    if (room.mode === "hunt") {
+      updateDaily(
+        player.username,
+        "hunt",
+        scores[player.playerId] || 0
+      );
+    }
 
-    sendProfile(
+    if (room.mode !== "chat") {
+      updateDaily(
+        player.username,
+        "streak",
+        p.streak
+      );
+    }
+
+    badgeCheck(p);
+  }
+
+  for (const player of players) {
+    updateProfileAndSend(
       player.username
     );
   }
@@ -1279,2553 +564,1594 @@ function applyGameResult(
 
   return {
     winnerIds,
-
     aScore,
-
     bScore
   };
 }
 
-function startMatch(
-  a,
-  b,
-  mode
-) {
+function recordCompletedGame(room) {
+  return applyGameResult(room);
+}
+
+function leaderboardPayload(mode) {
+  const rows =
+    [...leaderboard[mode].values()]
+      .sort(
+        (a, b) =>
+          b.wins - a.wins ||
+          b.points - a.points ||
+          a.username.localeCompare(b.username)
+      )
+      .slice(0, 10);
+
+  return {
+    mode,
+    rows
+  };
+}
+
+function xpLeaderboardPayload() {
+  const rows =
+    [...profiles.values()]
+      .sort(
+        (a, b) =>
+          b.xp - a.xp ||
+          b.level - a.level ||
+          a.username.localeCompare(b.username)
+      )
+      .slice(0, 10)
+      .map(p => ({
+        username: p.username,
+        xp: p.xp,
+        level: p.level
+      }));
+
+  return {
+    mode: "xp",
+    rows
+  };
+}
+
+function broadcastLeaderboards() {
+  for (const ws of clients) {
+    safeSend(ws, {
+      type: "leaderboards",
+      data: {
+        face: leaderboardPayload("face"),
+        hunt: leaderboardPayload("hunt"),
+        chat: leaderboardPayload("chat"),
+        pose: leaderboardPayload("pose"),
+        laugh: leaderboardPayload("laugh"),
+        xp: xpLeaderboardPayload()
+      }
+    });
+  }
+}
+
+function friendPayload(username) {
+  const f =
+    [...ensureFriends(username)];
+
+  const pending =
+    [...ensureRequests(username)];
+
+  const online =
+    f.filter(name =>
+      [...clients].some(
+        c => c.username === name
+      )
+    );
+
+  return {
+    type: "friends",
+    friends: f,
+    pending,
+    online
+  };
+}
+
+function sendFriends(username) {
+  send(
+    username,
+    friendPayload(username)
+  );
+}
+
+function addFriend(a, b) {
+  if (!a || !b || a === b) return false;
+
+  ensureFriends(a).add(b);
+  ensureFriends(b).add(a);
+
+  ensureRequests(a).delete(b);
+  ensureRequests(b).delete(a);
+
+  updateDaily(a, "friend", 1);
+  updateDaily(b, "friend", 1);
+
+  badgeCheck(ensureProfile(a));
+  badgeCheck(ensureProfile(b));
+
+  sendFriends(a);
+  sendFriends(b);
+
+  updateProfileAndSend(a);
+  updateProfileAndSend(b);
+
+  return true;
+}
+
+function sendRoomState(room) {
+  if (!room) return;
+
+  for (const player of [room.a, room.b]) {
+    const ws = getClientByPlayerId(
+      player.playerId
+    );
+
+    if (!ws) continue;
+
+    const opponent =
+      otherPlayer(
+        room,
+        player.playerId
+      );
+
+    safeSend(ws, {
+      type: "session-restored",
+      mode: room.mode,
+      roomId: room.id,
+      playerId: player.playerId,
+      opponentId: opponent?.playerId,
+      opponentUsername:
+        opponent?.username || "PLAYER",
+      role: player.role,
+      round: room.round,
+      totalRounds: room.totalRounds,
+      target: room.target,
+      scores: room.scores
+    });
+  }
+}
+
+function endRoom(room) {
+  if (!room) return;
+
+  rooms.delete(room.id);
+
+  for (const player of [room.a, room.b]) {
+    if (
+      sessions.get(player.sessionId)
+        ?.roomId === room.id
+    ) {
+      sessions.delete(
+        player.sessionId
+      );
+    }
+
+    const ws =
+      getClientByPlayerId(
+        player.playerId
+      );
+
+    if (ws) {
+      ws.__roomId = null;
+
+      safeSend(ws, {
+        type: "game-ended"
+      });
+    }
+  }
+}
+
+function createRoom(a, b, mode) {
+  const roomId =
+    crypto.randomUUID();
+
+  const playerA = {
+    playerId:
+      crypto.randomUUID(),
+    username:
+      a.username,
+    sessionId:
+      a.sessionId,
+    role: "a"
+  };
+
+  const playerB = {
+    playerId:
+      crypto.randomUUID(),
+    username:
+      b.username,
+    sessionId:
+      b.sessionId,
+    role: "b"
+  };
+
+  const totalRounds =
+    mode === "face"
+      ? FACE_ROUNDS
+      : mode === "pose"
+      ? POSE_ROUNDS
+      : mode === "laugh"
+      ? LAUGH_ROUNDS
+      : mode === "hunt"
+      ? HUNT_ROUNDS
+      : 1;
+
+  const room = {
+    id: roomId,
+    mode,
+    a: playerA,
+    b: playerB,
+    round: 1,
+    totalRounds,
+    target:
+      mode === "face"
+        ? randomEmoji()
+        : mode === "pose"
+        ? randomPose()
+        : mode === "hunt"
+        ? randomHuntItem()
+        : null,
+    scores: {
+      [playerA.playerId]: 0,
+      [playerB.playerId]: 0
+    },
+    roundScores: {},
+    bestFaceRound: {},
+    perfectFace: {},
+    completed: false,
+    disconnected: new Set(),
+    timers: {}
+  };
+
+  rooms.set(roomId, room);
+
+  a.__roomId = roomId;
+  b.__roomId = roomId;
+
+  a.__playerId =
+    playerA.playerId;
+
+  b.__playerId =
+    playerB.playerId;
+
+  sessions.set(
+    playerA.sessionId,
+    {
+      roomId,
+      playerId:
+        playerA.playerId,
+      username:
+        playerA.username
+    }
+  );
+
+  sessions.set(
+    playerB.sessionId,
+    {
+      roomId,
+      playerId:
+        playerB.playerId,
+      username:
+        playerB.username
+    }
+  );
+
+  safeSend(a, {
+    type: "matched",
+    mode,
+    roomId,
+    role: "a",
+    playerId:
+      playerA.playerId,
+    opponentId:
+      playerB.playerId,
+    opponentUsername:
+      playerB.username,
+    round: 1,
+    totalRounds,
+    target: room.target
+  });
+
+  safeSend(b, {
+    type: "matched",
+    mode,
+    roomId,
+    role: "b",
+    playerId:
+      playerB.playerId,
+    opponentId:
+      playerA.playerId,
+    opponentUsername:
+      playerA.username,
+    round: 1,
+    totalRounds,
+    target: room.target
+  });
+
+  startRoundTimer(room);
+
+  return room;
+}
+
+function startMatch(a, b, mode) {
   removeFromWaiting(a);
   removeFromWaiting(b);
 
-  a.queueMode = null;
-  b.queueMode = null;
-
-  const roomId =
-    createId();
-
-  const room = {
-    id:
-      roomId,
-
-    mode,
-
+  return createRoom(
     a,
-
     b,
-
-    round: 1,
-
-    totalRounds:
-      modeRounds(mode),
-
-    scores: {
-      [a.playerId]: 0,
-      [b.playerId]: 0
-    },
-
-    roundScores: {},
-
-    bestFaceRound: {
-      [a.playerId]: 0,
-      [b.playerId]: 0
-    },
-
-    perfectFace: {
-      [a.playerId]: true,
-      [b.playerId]: true
-    },
-
-    nextReady:
-      new Set(),
-
-    skipReady:
-      new Set(),
-
-    usedTargets:
-      new Set(),
-
-    target:
-      mode === "hunt"
-        ? nextHuntTarget(
-            new Set()
-          )
-        : mode === "face"
-          ? nextUnique(
-              EMOJIS,
-              new Set()
-            )
-          : mode === "pose"
-            ? randomItem([
-                "🕺",
-                "🙆‍♂️",
-                "🙋‍♂️",
-                "💪",
-                "🧍‍♂️",
-                "🤸"
-              ])
-            : null,
-
-    huntFound:
-      false,
-
-    huntStartedAt:
-      null,
-
-    huntTimer:
-      null,
-
-    laughScored:
-      false,
-
-    laughTimer:
-      null,
-
-    rematchReady:
-      new Set(),
-
-    completed:
-      false
-  };
-
-  rooms.set(
-    roomId,
-    room
-  );
-
-  a.roomId =
-    roomId;
-
-  b.roomId =
-    roomId;
-
-  a.opponentUsername =
-    b.username;
-
-  b.opponentUsername =
-    a.username;
-
-  const base = {
-    type:
-      "match-started",
-
-    roomId,
-
-    mode,
-
-    totalRounds:
-      room.totalRounds,
-
-    round: 1
-  };
-
-  send(a, {
-    ...base,
-
-    opponentUsername:
-      b.username,
-
-    target:
-      room.target
-  });
-
-  send(b, {
-    ...base,
-
-    opponentUsername:
-      a.username,
-
-    target:
-      room.target
-  });
-
-  if (
-    mode === "hunt"
-  ) {
-    scheduleHuntTimeout(
-      room
-    );
-  }
-
-  if (
-    mode === "laugh"
-  ) {
-    scheduleLaughTimeout(
-      room
-    );
-  }
-}
-
-function putInQueue(
-  ws,
-  mode
-) {
-  removeFromWaiting(ws);
-
-  ws.queueMode =
-    mode;
-
-  waiting.push(ws);
-
-  send(ws, {
-    type:
-      "waiting",
-
     mode
-  });
+  );
 }
 
-function findWaitingOpponent(
-  mode
-) {
-  for (
-    let i = 0;
-    i < waiting.length;
-    i++
-  ) {
-    const candidate =
-      waiting[i];
+function startRoundTimer(room) {
+  if (!room) return;
 
-    if (
-      candidate &&
-      candidate.readyState ===
-        1 &&
-      candidate.queueMode ===
-        mode &&
-      !candidate.roomId
-    ) {
-      waiting.splice(
-        i,
-        1
-      );
+  if (room.timers.round) {
+    clearTimeout(
+      room.timers.round
+    );
+  }
 
-      candidate.queueMode =
-        null;
+  let seconds =
+    room.mode === "face"
+      ? 15
+      : room.mode === "pose"
+      ? 15
+      : room.mode === "laugh"
+      ? 30
+      : room.mode === "hunt"
+      ? 60
+      : 0;
 
-      return candidate;
-    }
+  if (!seconds) return;
+
+  room.timers.round =
+    setTimeout(() => {
+      finishRound(room);
+    }, seconds * 1000);
+}
+
+function nextTarget(room) {
+  if (room.mode === "face") {
+    return randomEmoji();
+  }
+
+  if (room.mode === "pose") {
+    return randomPose();
+  }
+
+  if (room.mode === "hunt") {
+    return randomHuntItem();
   }
 
   return null;
 }
 
-function clearHuntTimer(
-  room
-) {
-  if (
-    room?.huntTimer
-  ) {
-    clearTimeout(
-      room.huntTimer
-    );
+function finishRound(room) {
+  if (!room || room.completed) return;
 
-    room.huntTimer =
-      null;
-  }
-}
+  const players =
+    [room.a, room.b];
 
-function clearLaughTimer(
-  room
-) {
-  if (
-    room?.laughTimer
-  ) {
-    clearTimeout(
-      room.laughTimer
-    );
+  if (room.mode === "chat") {
+    const result =
+      recordCompletedGame(room);
 
-    room.laughTimer =
-      null;
-  }
-}
-
-function scheduleHuntTimeout(
-  room
-) {
-  clearHuntTimer(
-    room
-  );
-
-  room.huntStartedAt =
-    Date.now();
-
-  room.huntTimer =
-    setTimeout(
-      () => {
-        if (
-          rooms.get(
-            room.id
-          ) !== room ||
-          room.completed ||
-          room.mode !==
-            "hunt" ||
-          room.huntFound
-        ) {
-          return;
+    for (const player of players) {
+      safeSend(
+        getClientByPlayerId(
+          player.playerId
+        ),
+        {
+          type: "game-result",
+          mode: room.mode,
+          yourScore:
+            room.scores[player.playerId] || 0,
+          opponentScore:
+            room.scores[
+              otherPlayer(
+                room,
+                player.playerId
+              )?.playerId
+            ] || 0,
+          tie:
+            result?.winnerIds?.size === 0
         }
+      );
+    }
 
-        room.huntFound =
-          true;
-
-        send(
-          room.a,
-          {
-            type:
-              "hunt-timeout",
-
-            round:
-              room.round
-          }
-        );
-
-        send(
-          room.b,
-          {
-            type:
-              "hunt-timeout",
-
-            round:
-              room.round
-          }
-        );
-
-        sendNextRound(
-          room
-        );
-      },
-      HUNT_TIMEOUT_MS
-    );
-}
-
-function scheduleLaughTimeout(
-  room
-) {
-  clearLaughTimer(
-    room
-  );
-
-  if (
-    room.mode !==
-    "laugh"
-  ) {
     return;
   }
 
-  room.laughScored =
-    false;
+  room.roundScores =
+    room.roundScores || {};
 
-  room.laughTimer =
-    setTimeout(
-      () => {
-        if (
-          rooms.get(
-            room.id
-          ) !== room ||
-          room.completed ||
-          room.mode !==
-            "laugh" ||
-          room.laughScored
-        ) {
-          return;
-        }
-
-        room.laughScored =
-          true;
-
-        send(
-          room.a,
-          {
-            type:
-              "laugh-timeout",
-
-            round:
-              room.round,
-
-            scores:
-              room.scores
-          }
-        );
-
-        send(
-          room.b,
-          {
-            type:
-              "laugh-timeout",
-
-            round:
-              room.round,
-
-            scores:
-              room.scores
-          }
-        );
-
-        setTimeout(
-          () => {
-            if (
-              rooms.get(
-                room.id
-              ) === room
-            ) {
-              sendNextRound(
-                room
-              );
-            }
-          },
-          1400
-        );
-      },
-      LAUGH_TIMEOUT_MS
-    );
-}
-
-function sendNextRound(
-  room
-) {
-  if (
-    !room ||
-    room.completed
-  ) {
-    return;
-  }
-
-  clearHuntTimer(
-    room
-  );
-
-  clearLaughTimer(
-    room
-  );
+  room.roundScores[room.round] =
+    { ...room.scores };
 
   if (
     room.round >=
     room.totalRounds
   ) {
     const result =
-      applyGameResult(
-        room
-      );
+      recordCompletedGame(room);
 
-    send(
-      room.a,
-      {
-        type:
-          "game-complete",
+    for (const player of players) {
+      const ws =
+        getClientByPlayerId(
+          player.playerId
+        );
 
-        mode:
-          room.mode,
-
-        scores:
-          room.scores,
-
-        result
-      }
-    );
-
-    send(
-      room.b,
-      {
-        type:
-          "game-complete",
-
-        mode:
-          room.mode,
-
-        scores:
-          room.scores,
-
-        result
-      }
-    );
+      safeSend(ws, {
+        type: "game-result",
+        mode: room.mode,
+        yourScore:
+          room.scores[player.playerId] || 0,
+        opponentScore:
+          room.scores[
+            otherPlayer(
+              room,
+              player.playerId
+            )?.playerId
+          ] || 0,
+        tie:
+          result?.winnerIds?.size === 0
+      });
+    }
 
     return;
   }
 
   room.round += 1;
 
-  room.roundScores =
-    {};
+  room.target =
+    nextTarget(room);
 
-  room.nextReady.clear();
+  room.scores = {
+    [room.a.playerId]:
+      room.scores[room.a.playerId] || 0,
+    [room.b.playerId]:
+      room.scores[room.b.playerId] || 0
+  };
 
-  room.skipReady.clear();
-
-  room.huntFound =
-    false;
-
-  room.laughScored =
-    false;
-
-  if (
-    room.mode ===
-    "hunt"
-  ) {
-    room.target =
-      nextHuntTarget(
-        room.usedTargets
+  for (const player of players) {
+    const ws =
+      getClientByPlayerId(
+        player.playerId
       );
-  }
 
-  if (
-    room.mode ===
-    "face"
-  ) {
-    room.target =
-      nextUnique(
-        EMOJIS,
-        room.usedTargets
-      );
-  }
+    if (!ws) continue;
 
-  if (
-    room.mode ===
-    "pose"
-  ) {
-    room.target =
-      randomItem([
-        "🕺",
-        "🙆‍♂️",
-        "🙋‍♂️",
-        "💪",
-        "🧍‍♂️",
-        "🤸"
-      ]);
-  }
-
-  send(
-    room.a,
-    {
-      type:
-        "new-round",
-
-      round:
-        room.round,
-
+    safeSend(ws, {
+      type: "new-round",
+      mode: room.mode,
+      round: room.round,
       totalRounds:
         room.totalRounds,
-
-      mode:
-        room.mode,
-
-      target:
-        room.target
-    }
-  );
-
-  send(
-    room.b,
-    {
-      type:
-        "new-round",
-
-      round:
-        room.round,
-
-      totalRounds:
-        room.totalRounds,
-
-      mode:
-        room.mode,
-
-      target:
-        room.target
-    }
-  );
-
-  if (
-    room.mode ===
-    "hunt"
-  ) {
-    scheduleHuntTimeout(
-      room
-    );
+      target: room.target
+    });
   }
 
-  if (
-    room.mode ===
-    "laugh"
-  ) {
-    scheduleLaughTimeout(
-      room
-    );
-  }
+  startRoundTimer(room);
 }
 
-function endRoom(
-  ws,
-  notifyOpponent = true
-) {
-  if (!ws.roomId) {
-    return;
-  }
+function requeueAfterSkip(ws) {
+  if (!ws) return;
 
-  const room =
-    rooms.get(
-      ws.roomId
+  const mode =
+    ws.__mode;
+
+  if (!mode) return;
+
+  removeFromWaiting(ws);
+
+  ws.__roomId = null;
+
+  waiting.push(ws);
+
+  safeSend(ws, {
+    type: "waiting",
+    mode,
+    message:
+      "Looking for another player..."
+  });
+
+  tryMatch(mode);
+}
+
+function tryMatch(mode) {
+  const eligible =
+    waiting.filter(
+      ws =>
+        ws.__mode === mode &&
+        ws.readyState === 1
     );
 
-  if (!room) {
-    ws.roomId =
-      null;
+  while (eligible.length >= 2) {
+    const a =
+      eligible.shift();
 
-    return;
-  }
+    const b =
+      eligible.shift();
 
-  clearHuntTimer(
-    room
-  );
+    const ia =
+      waiting.indexOf(a);
 
-  clearLaughTimer(
-    room
-  );
+    if (ia !== -1)
+      waiting.splice(ia, 1);
 
-  const opponent =
-    room.a === ws
-      ? room.b
-      : room.a;
+    const ib =
+      waiting.indexOf(b);
 
-  rooms.delete(
-    room.id
-  );
-
-  ws.roomId =
-    null;
-
-  ws.queueMode =
-    null;
-
-  if (opponent) {
-    opponent.roomId =
-      null;
-
-    opponent.queueMode =
-      null;
+    if (ib !== -1)
+      waiting.splice(ib, 1);
 
     if (
-      notifyOpponent &&
-      opponent.readyState ===
-        1
+      a === b ||
+      a.readyState !== 1 ||
+      b.readyState !== 1
     ) {
-      send(
-        opponent,
-        {
-          type:
-            "opponent-disconnected",
+      if (
+        a.readyState === 1 &&
+        a !== b
+      ) {
+        waiting.push(a);
+      }
 
-          reason:
-            "opponent-left",
+      if (
+        b.readyState === 1
+      ) {
+        waiting.push(b);
+      }
 
-          opponentUsername:
-            ws.username
-        }
-      );
+      continue;
     }
+
+    startMatch(
+      a,
+      b,
+      mode
+    );
   }
 }
 
-wss.on(
-  "connection",
-  ws => {
-    ws.playerId =
-      createId();
+function findMatch(ws, mode) {
+  ws.__mode = mode;
 
-    ws.username =
-      "Guest";
-
-    ws.roomId =
-      null;
-
-    ws.queueMode =
-      null;
-
-    ws.opponentUsername =
-      null;
-
-    ws.isAlive =
-      true;
-
-    clients.add(ws);
-
-    ensureProfile(
-      ws.username
+  const existingSession =
+    sessions.get(
+      ws.sessionId
     );
 
-    send(ws, {
-      type:
-        "connected",
+  if (existingSession) {
+    const room =
+      rooms.get(
+        existingSession.roomId
+      );
 
-      playerId:
-        ws.playerId
-    });
+    if (
+      room &&
+      roomHasPlayer(
+        room,
+        existingSession.playerId
+      )
+    ) {
+      ws.__playerId =
+        existingSession.playerId;
 
-    send(
-      ws,
-      onlinePayload()
-    );
+      ws.__roomId =
+        room.id;
 
-    send(
-      ws,
-      profilePayload(
-        ws.username
+      sendRoomState(room);
+
+      return;
+    }
+  }
+
+  removeFromWaiting(ws);
+
+  ws.__roomId = null;
+
+  for (const room of rooms.values()) {
+    if (
+      room.mode === mode &&
+      roomHasPlayer(
+        room,
+        ws.__playerId
+      )
+    ) {
+      ws.__roomId = room.id;
+
+      sendRoomState(room);
+
+      return;
+    }
+  }
+
+  waiting.push(ws);
+
+  safeSend(ws, {
+    type: "waiting",
+    mode,
+    message:
+      "Looking for another player..."
+  });
+
+  tryMatch(mode);
+}
+
+function handleFaceScore(ws, message) {
+  const room =
+    rooms.get(ws.__roomId);
+
+  if (!room) return;
+
+  if (
+    room.mode !== "face" ||
+    room.completed
+  ) return;
+
+  const score =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(message.score) || 0
       )
     );
 
-    ws.on(
-      "pong",
-      () => {
-        ws.isAlive =
-          true;
-      }
+  room.scores[
+    ws.__playerId
+  ] =
+    Math.max(
+      room.scores[
+        ws.__playerId
+      ] || 0,
+      score
     );
 
-    ws.on(
-      "message",
-      raw => {
-        let message;
-
-        try {
-          message =
-            JSON.parse(
-              raw.toString()
-            );
-        } catch {
-          return;
-        }
-
-        if (
-          message.type ===
-          "set-username"
-        ) {
-          const oldName =
-            ws.username;
-
-          const newName =
-            cleanName(
-              message.username
-            );
-
-          ws.username =
-            newName;
-
-          ensureProfile(
-            newName
-          );
-
-          send(
-            ws,
-            {
-              type:
-                "username-set",
-
-              username:
-                newName
-            }
-          );
-
-          sendProfile(
-            newName
-          );
-
-          broadcastOnline();
-
-          if (
-            oldName !==
-            newName
-          ) {
-            sendFriends(
-              oldName
-            );
-          }
-
-          return;
-        }
-
-        if (
-          message.type ===
-          "get-profile"
-        ) {
-          sendProfile(
-            ws.username
-          );
-
-          return;
-        }
-
-        if (
-          message.type ===
-          "get-leaderboards"
-        ) {
-          for (
-            const mode of [
-              "face",
-              "hunt",
-              "chat",
-              "pose",
-              "laugh"
-            ]
-          ) {
-            send(
-              ws,
-              leaderboardPayload(
-                mode
-              )
-            );
-          }
-
-          send(
-            ws,
-            xpLeaderboardPayload()
-          );
-
-          send(
-            ws,
-            profilePayload(
-              ws.username
-            )
-          );
-
-          return;
-        }
-
-        if (
-          message.type ===
-          "friend-request"
-        ) {
-          const targetName =
-            cleanName(
-              message.username ||
-              message.to
-            );
-
-          if (
-            !targetName ||
-            targetName ===
-              ws.username
-          ) {
-            return;
-          }
-
-          const target =
-            [...clients].find(
-              c =>
-                c.username ===
-                targetName
-            );
-
-          if (!target) {
-            send(
-              ws,
-              {
-                type:
-                  "friend-result",
-
-                ok: false,
-
-                error:
-                  "That player is not online."
-              }
-            );
-
-            return;
-          }
-
-          if (
-            isFriend(
-              ws.username,
-              targetName
-            )
-          ) {
-            send(
-              ws,
-              {
-                type:
-                  "friend-result",
-
-                ok: false,
-
-                error:
-                  "You are already friends."
-              }
-            );
-
-            return;
-          }
-
-          ensureSet(
-            friendRequests,
-            targetName
-          ).add(
-            ws.username
-          );
-
-          send(
-            target,
-            {
-              type:
-                "friend-request",
-
-              from:
-                ws.username
-            }
-          );
-
-          send(
-            ws,
-            {
-              type:
-                "friend-result",
-
-              ok: true,
-
-              message:
-                `Friend request sent to ${targetName}.`
-            }
-          );
-
-          sendFriends(
-            targetName
-          );
-
-          return;
-        }
-
-        if (
-          message.type ===
-          "friend-accept"
-        ) {
-          const from =
-            cleanName(
-              message.username ||
-              message.from
-            );
-
-          const requests =
-            ensureSet(
-              friendRequests,
-              ws.username
-            );
-
-          if (
-            !requests.has(
-              from
-            )
-          ) {
-            return;
-          }
-
-          requests.delete(
-            from
-          );
-
-          ensureSet(
-            friends,
-            ws.username
-          ).add(from);
-
-          ensureSet(
-            friends,
-            from
-          ).add(
-            ws.username
-          );
-
-          updateDaily(
-            ws.username,
-            "friend",
-            1
-          );
-
-          updateDaily(
-            from,
-            "friend",
-            1
-          );
-
-          updateProfileAndSend(
-            ws.username
-          );
-
-          updateProfileAndSend(
-            from
-          );
-
-          sendFriends(
-            ws.username
-          );
-
-          sendFriends(
-            from
-          );
-
-          return;
-        }
-
-        if (
-          message.type ===
-          "friend-decline"
-        ) {
-          const from =
-            cleanName(
-              message.username ||
-              message.from
-            );
-
-          ensureSet(
-            friendRequests,
-            ws.username
-          ).delete(
-            from
-          );
-
-          sendFriends(
-            ws.username
-          );
-
-          return;
-        }
-
-        if (
-          message.type ===
-          "friend-remove"
-        ) {
-          const target =
-            cleanName(
-              message.username ||
-              message.to
-            );
-
-          ensureSet(
-            friends,
-            ws.username
-          ).delete(
-            target
-          );
-
-          ensureSet(
-            friends,
-            target
-          ).delete(
-            ws.username
-          );
-
-          sendFriends(
-            ws.username
-          );
-
-          sendFriends(
-            target
-          );
-
-          updateProfileAndSend(
-            ws.username
-          );
-
-          updateProfileAndSend(
-            target
-          );
-
-          return;
-        }
-
-        if (
-          message.type ===
-          "friend-invite"
-        ) {
-          const to =
-            cleanName(
-              message.to
-            );
-
-          const mode =
-            [
-              "face",
-              "chat",
-              "hunt",
-              "pose",
-              "laugh"
-            ].includes(
-              message.mode
-            )
-              ? message.mode
-              : "face";
-
-          if (
-            !to ||
-            to ===
-              ws.username
-          ) {
-            return;
-          }
-
-          if (
-            !isFriend(
-              ws.username,
-              to
-            )
-          ) {
-            send(
-              ws,
-              {
-                type:
-                  "invite-result",
-
-                ok: false,
-
-                error:
-                  "You can only invite friends."
-              }
-            );
-
-            return;
-          }
-
-          const target =
-            [...clients].find(
-              c =>
-                c.username ===
-                to
-            );
-
-          if (!target) {
-            send(
-              ws,
-              {
-                type:
-                  "invite-result",
-
-                ok: false,
-
-                error:
-                  "That friend is offline."
-              }
-            );
-
-            return;
-          }
-
-          if (
-            ws.roomId ||
-            ws.queueMode
-          ) {
-            send(
-              ws,
-              {
-                type:
-                  "invite-result",
-
-                ok: false,
-
-                error:
-                  "Leave your current match before sending an invite."
-              }
-            );
-
-            return;
-          }
-
-          if (
-            target.roomId ||
-            target.queueMode
-          ) {
-            send(
-              ws,
-              {
-                type:
-                  "invite-result",
-
-                ok: false,
-
-                error:
-                  "That friend is already busy."
-              }
-            );
-
-            return;
-          }
-
-          const inviteId =
-            createId();
-
-          pendingInvites.set(
-            inviteId,
-            {
-              from:
-                ws.username,
-
-              to,
-
-              mode,
-
-              createdAt:
-                Date.now()
-            }
-          );
-
-          send(
-            target,
-            {
-              type:
-                "game-invite",
-
-              inviteId,
-
-              from:
-                ws.username,
-
-              mode
-            }
-          );
-
-          send(
-            ws,
-            {
-              type:
-                "invite-result",
-
-              ok: true,
-
-              message:
-                `Invite sent to ${to}.`
-            }
-          );
-
-          return;
-        }
-
-        if (
-          message.type ===
-          "decline-invite"
-        ) {
-          const id =
-            String(
-              message.inviteId ||
-              ""
-            );
-
-          const invite =
-            pendingInvites.get(
-              id
-            );
-
-          if (
-            !invite ||
-            invite.to !==
-              ws.username
-          ) {
-            return;
-          }
-
-          pendingInvites.delete(
-            id
-          );
-
-          const sender =
-            [...clients].find(
-              c =>
-                c.username ===
-                invite.from
-            );
-
-          if (sender) {
-            send(
-              sender,
-              {
-                type:
-                  "invite-declined",
-
-                from:
-                  ws.username
-              }
-            );
-          }
-
-          return;
-        }
-
-        if (
-          message.type ===
-          "accept-invite"
-        ) {
-          const id =
-            String(
-              message.inviteId ||
-              ""
-            );
-
-          const invite =
-            pendingInvites.get(
-              id
-            );
-
-          if (
-            !invite ||
-            invite.to !==
-              ws.username
-          ) {
-            send(
-              ws,
-              {
-                type:
-                  "invite-result",
-
-                ok: false,
-
-                error:
-                  "That invite is no longer available."
-              }
-            );
-
-            return;
-          }
-
-          if (
-            ws.roomId ||
-            ws.queueMode
-          ) {
-            send(
-              ws,
-              {
-                type:
-                  "invite-result",
-
-                ok: false,
-
-                error:
-                  "You are already in a game."
-              }
-            );
-
-            return;
-          }
-
-          const sender =
-            [...clients].find(
-              c =>
-                c.username ===
-                invite.from
-            );
-
-          if (
-            !sender ||
-            sender.roomId ||
-            sender.queueMode
-          ) {
-            pendingInvites.delete(
-              id
-            );
-
-            send(
-              ws,
-              {
-                type:
-                  "invite-result",
-
-                ok: false,
-
-                error:
-                  "Your friend is no longer available."
-              }
-            );
-
-            return;
-          }
-
-          pendingInvites.delete(
-            id
-          );
-
-          startMatch(
-            sender,
-            ws,
-            invite.mode
-          );
-
-          broadcastOnline();
-
-          return;
-        }
-
-        if (
-          message.type ===
-          "dm"
-        ) {
-          const to =
-            cleanName(
-              message.to
-            );
-
-          const text =
-            String(
-              message.text ||
-              ""
-            )
-              .trim()
-              .slice(
-                0,
-                300
-              );
-
-          if (
-            !text ||
-            !isFriend(
-              ws.username,
-              to
-            )
-          ) {
-            return;
-          }
-
-          addDm(
-            ws.username,
-            to,
-            text
-          );
-
-          for (
-            const c of clients
-          ) {
-            if (
-              c.username ===
-              to
-            ) {
-              send(
-                c,
-                {
-                  type:
-                    "dm",
-
-                  from:
-                    ws.username,
-
-                  text,
-
-                  createdAt:
-                    new Date().toISOString()
-                }
-              );
-            }
-          }
-
-          send(
-            ws,
-            {
-              type:
-                "dm",
-
-              from:
-                ws.username,
-
-              text,
-
-              createdAt:
-                new Date().toISOString()
-            }
-          );
-
-          sendDmHistory(
-            ws.username,
-            to
-          );
-
-          sendDmHistory(
-            to,
-            ws.username
-          );
-
-          return;
-        }
-
-        if (
-          message.type ===
-          "get-dm-history"
-        ) {
-          const to =
-            cleanName(
-              message.to
-            );
-
-          if (
-            isFriend(
-              ws.username,
-              to
-            )
-          ) {
-            sendDmHistory(
-              ws.username,
-              to
-            );
-          }
-
-          return;
-        }
-
-        if (
-          message.type ===
-          "report"
-        ) {
-          const allowedModes = [
-            "face",
-            "chat",
-            "hunt",
-            "pose",
-            "laugh"
-          ];
-
-          const reasons = [
-            "harassment",
-            "sexual-content",
-            "hate",
-            "threats",
-            "spam",
-            "privacy",
-            "other"
-          ];
-
-          const room =
-            ws.roomId
-              ? rooms.get(
-                  ws.roomId
-                )
-              : null;
-
-          const mode =
-            allowedModes.includes(
-              message.mode
-            )
-              ? message.mode
-              : room?.mode;
-
-          if (
-            !mode ||
-            !room
-          ) {
-            send(
-              ws,
-              {
-                type:
-                  "report-result",
-
-                ok: false,
-
-                error:
-                  "You can only report someone while connected to a game."
-              }
-            );
-
-            return;
-          }
-
-          const opponent =
-            room.a === ws
-              ? room.b
-              : room.a;
-
-          if (!opponent) {
-            return;
-          }
-
-          const reason =
-            reasons.includes(
-              message.reason
-            )
-              ? message.reason
-              : "other";
-
-          const details =
-            String(
-              message.details ||
-              ""
-            )
-              .trim()
-              .slice(
-                0,
-                1000
-              );
-
-          const report = {
-            id:
-              createId(),
-
-            createdAt:
-              new Date().toISOString(),
-
-            mode,
-
-            reporterId:
-              ws.playerId,
-
-            reporterUsername:
-              ws.username,
-
-            reportedId:
-              opponent.playerId,
-
-            reportedUsername:
-              opponent.username,
-
-            roomId:
-              room.id,
-
-            reason,
-
-            details
-          };
-
-          reports.push(
-            report
-          );
-
-          if (
-            reports.length >
-            MAX_REPORTS
-          ) {
-            reports.shift();
-          }
-
-          console.log(
-            "EmojiTV REPORT",
-            JSON.stringify(
-              report
-            )
-          );
-
-          send(
-            ws,
-            {
-              type:
-                "report-result",
-
-              ok: true,
-
-              reportId:
-                report.id
-            }
-          );
-
-          return;
-        }
-
-        if (
-          message.type ===
-          "find-match"
-        ) {
-          const mode =
-            [
-              "face",
-              "chat",
-              "hunt",
-              "pose",
-              "laugh"
-            ].includes(
-              message.mode
-            )
-              ? message.mode
-              : "face";
-
-          if (
-            message.username
-          ) {
-            ws.username =
-              cleanName(
-                message.username
-              );
-
-            ensureProfile(
-              ws.username
-            );
-          }
-
-          removeFromWaiting(
-            ws
-          );
-
-          const opponent =
-            findWaitingOpponent(
-              mode
-            );
-
-          if (opponent) {
-            startMatch(
-              opponent,
-              ws,
-              mode
-            );
-          } else {
-            putInQueue(
-              ws,
-              mode
-            );
-          }
-
-          broadcastOnline();
-
-          sendProfile(
-            ws.username
-          );
-
-          return;
-        }
-
-        if (
-          message.type ===
-          "skip"
-        ) {
-          const oldMode =
-            ws.roomId
-              ? rooms.get(
-                  ws.roomId
-                )?.mode
-              : ws.queueMode;
-
-          endRoom(
-            ws,
-            true
-          );
-
-          if (oldMode) {
-            putInQueue(
-              ws,
-              oldMode
-            );
-          }
-
-          broadcastOnline();
-
-          return;
-        }
-
-        if (
-          message.type ===
-          "leave"
-        ) {
-          endRoom(
-            ws,
-            true
-          );
-
-          broadcastOnline();
-
-          return;
-        }
-
-        if (!ws.roomId) {
-          return;
-        }
-
-        const room =
-          rooms.get(
-            ws.roomId
-          );
-
-        if (!room) {
-          return;
-        }
-
-        const opponent =
-          room.a === ws
-            ? room.b
-            : room.a;
-
-        if (
-          message.type ===
-          "rematch-ready"
-        ) {
-          room.rematchReady.add(
-            ws.playerId
-          );
-
-          send(
-            room.a,
-            {
-              type:
-                "rematch-status",
-
-              ready:
-                room.rematchReady
-                  .size
-            }
-          );
-
-          send(
-            room.b,
-            {
-              type:
-                "rematch-status",
-
-              ready:
-                room.rematchReady
-                  .size
-            }
-          );
-
-          if (
-            room.rematchReady
-              .size === 2
-          ) {
-            room.rematchReady.clear();
-
-            room.completed =
-              false;
-
-            room.round =
-              1;
-
-            room.scores = {
-              [room.a.playerId]:
-                0,
-
-              [room.b.playerId]:
-                0
-            };
-
-            room.roundScores =
-              {};
-
-            room.bestFaceRound =
-              {};
-
-            room.perfectFace = {
-              [room.a.playerId]:
-                true,
-
-              [room.b.playerId]:
-                true
-            };
-
-            room.nextReady =
-              new Set();
-
-            room.skipReady =
-              new Set();
-
-            room.huntFound =
-              false;
-
-            room.usedTargets =
-              new Set();
-
-            room.target =
-              room.mode ===
-              "hunt"
-                ? nextHuntTarget(
-                    room.usedTargets
-                  )
-                : room.mode ===
-                  "face"
-                  ? nextUnique(
-                      EMOJIS,
-                      room.usedTargets
-                    )
-                  : room.mode ===
-                    "pose"
-                    ? randomItem([
-                        "🕺",
-                        "🙆‍♂️",
-                        "🙋‍♂️",
-                        "💪",
-                        "🧍‍♂️",
-                        "🤸"
-                      ])
-                    : null;
-
-            room.laughScored =
-              false;
-
-            send(
-              room.a,
-              {
-                type:
-                  "rematch-started",
-
-                round:
-                  1,
-
-                totalRounds:
-                  room.totalRounds,
-
-                mode:
-                  room.mode,
-
-                target:
-                  room.target
-              }
-            );
-
-            send(
-              room.b,
-              {
-                type:
-                  "rematch-started",
-
-                round:
-                  1,
-
-                totalRounds:
-                  room.totalRounds,
-
-                mode:
-                  room.mode,
-
-                target:
-                  room.target
-              }
-            );
-
-            if (
-              room.mode ===
-              "hunt"
-            ) {
-              scheduleHuntTimeout(
-                room
-              );
-            }
-
-            if (
-              room.mode ===
-              "laugh"
-            ) {
-              scheduleLaughTimeout(
-                room
-              );
-            }
-          }
-
-          return;
-        }
-
-        if (
-          message.type ===
-            "skip-item" &&
-          room.mode ===
-            "hunt"
-        ) {
-          if (
-            room.huntFound
-          ) {
-            return;
-          }
-
-          room.skipReady.add(
-            ws.playerId
-          );
-
-          send(
-            room.a,
-            {
-              type:
-                "skip-item-status",
-
-              ready:
-                room.skipReady
-                  .size
-            }
-          );
-
-          send(
-            room.b,
-            {
-              type:
-                "skip-item-status",
-
-              ready:
-                room.skipReady
-                  .size
-            }
-          );
-
-          if (
-            room.skipReady
-              .size === 2
-          ) {
-            room.skipReady.clear();
-
-            room.huntFound =
-              false;
-
-            room.roundScores =
-              {};
-
-            room.target =
-              nextHuntTarget(
-                room.usedTargets
-              );
-
-            send(
-              room.a,
-              {
-                type:
-                  "new-round",
-
-                round:
-                  room.round,
-
-                totalRounds:
-                  room.totalRounds,
-
-                mode:
-                  "hunt",
-
-                target:
-                  room.target,
-
-                skipped:
-                  true
-              }
-            );
-
-            send(
-              room.b,
-              {
-                type:
-                  "new-round",
-
-                round:
-                  room.round,
-
-                totalRounds:
-                  room.totalRounds,
-
-                mode:
-                  "hunt",
-
-                target:
-                  room.target,
-
-                skipped:
-                  true
-              }
-            );
-
-            scheduleHuntTimeout(
-              room
-            );
-          }
-
-          return;
-        }
-
-        if (
-          message.type ===
-            "round-score" &&
-          room.mode ===
-            "face"
-        ) {
-          const score =
-            Math.max(
-              0,
-              Math.min(
-                100,
-                Number(
-                  message.score
-                ) || 0
-              )
-            );
-
-          room.roundScores[
-            ws.playerId
-          ] = score;
-
-          room.bestFaceRound =
-            room.bestFaceRound ||
-            {};
-
-          room.bestFaceRound[
-            ws.playerId
-          ] = Math.max(
-            room.bestFaceRound[
-              ws.playerId
-            ] || 0,
-            score
-          );
-
-          room.perfectFace =
-            room.perfectFace ||
-            {};
-
-          if (
-            score < 100
-          ) {
-            room.perfectFace[
-              ws.playerId
-            ] = false;
-          }
-
-          room.scores[
-            ws.playerId
-          ] =
-            (
-              room.scores[
-                ws.playerId
-              ] || 0
-            ) + score;
-
-          send(
-            ws,
-            {
-              type:
-                "your-score",
-
-              score,
-
-              totalScore:
-                room.scores[
-                  ws.playerId
-                ],
-
-              round:
-                room.round
-            }
-          );
-
-          send(
-            opponent,
-            {
-              type:
-                "opponent-score",
-
-              score,
-
-              totalScore:
-                room.scores[
-                  ws.playerId
-                ],
-
-              round:
-                room.round
-            }
-          );
-
-          return;
-        }
-
-        if (
-          message.type ===
-            "pose-score" &&
-          room.mode ===
-            "pose"
-        ) {
-          const score =
-            Math.max(
-              0,
-              Math.min(
-                100,
-                Number(
-                  message.score
-                ) || 0
-              )
-            );
-
-          room.roundScores[
-            ws.playerId
-          ] = score;
-
-          room.scores[
-            ws.playerId
-          ] =
-            (
-              room.scores[
-                ws.playerId
-              ] || 0
-            ) + score;
-
-          send(
-            ws,
-            {
-              type:
-                "your-score",
-
-              score,
-
-              totalScore:
-                room.scores[
-                  ws.playerId
-                ],
-
-              round:
-                room.round
-            }
-          );
-
-          send(
-            opponent,
-            {
-              type:
-                "pose-score",
-
-              score,
-
-              opponentId:
-                ws.playerId,
-
-              totalScore:
-                room.scores[
-                  ws.playerId
-                ],
-
-              round:
-                room.round
-            }
-          );
-
-          return;
-        }
-
-        if (
-          message.type ===
-            "laugh" &&
-          room.mode ===
-            "laugh" &&
-          !room.laughScored
-        ) {
-          room.laughScored =
-            true;
-
-          clearLaughTimer(
-            room
-          );
-
-          room.scores[
-            ws.playerId
-          ] =
-            (
-              room.scores[
-                ws.playerId
-              ] || 0
-            ) + 1;
-
-          send(
-            ws,
-            {
-              type:
-                "laugh-you-laughed",
-
-              scores:
-                room.scores,
-
-              round:
-                room.round
-            }
-          );
-
-          send(
-            opponent,
-            {
-              type:
-                "laugh-point",
-
-              from:
-                ws.username,
-
-              opponentId:
-                ws.playerId,
-
-              scores:
-                room.scores,
-
-              round:
-                room.round
-            }
-          );
-
-          setTimeout(
-            () => {
-              if (
-                rooms.get(
-                  room.id
-                ) === room
-              ) {
-                sendNextRound(
-                  room
-                );
-              }
-            },
-            1400
-          );
-
-          return;
-        }
-
-        if (
-          message.type ===
-            "hunt-timeout" &&
-          room.mode ===
-            "hunt" &&
-          !room.huntFound
-        ) {
-          if (
-            !room.huntStartedAt ||
-            Date.now() -
-              room.huntStartedAt <
-              HUNT_TIMEOUT_MS
-          ) {
-            return;
-          }
-
-          room.huntFound =
-            true;
-
-          clearHuntTimer(
-            room
-          );
-
-          send(
-            room.a,
-            {
-              type:
-                "hunt-timeout",
-
-              round:
-                room.round
-            }
-          );
-
-          send(
-            room.b,
-            {
-              type:
-                "hunt-timeout",
-
-              round:
-                room.round
-            }
-          );
-
-          sendNextRound(
-            room
-          );
-
-          return;
-        }
-
-        if (
-          message.type ===
-            "hunt-found" &&
-          room.mode ===
-            "hunt" &&
-          !room.huntFound
-        ) {
-          if (
-            !room.huntStartedAt ||
-            Date.now() -
-              room.huntStartedAt >
-              HUNT_TIMEOUT_MS
-          ) {
-            return;
-          }
-
-          room.huntFound =
-            true;
-
-          clearHuntTimer(
-            room
-          );
-
-          room.scores[
-            ws.playerId
-          ] += 1;
-
-          send(
-            room.a,
-            {
-              type:
-                "hunt-winner",
-
-              winnerId:
-                ws.playerId,
-
-              round:
-                room.round,
-
-              scores:
-                room.scores
-            }
-          );
-
-          send(
-            room.b,
-            {
-              type:
-                "hunt-winner",
-
-              winnerId:
-                ws.playerId,
-
-              round:
-                room.round,
-
-              scores:
-                room.scores
-            }
-          );
-
-          setTimeout(
-            () => {
-              if (
-                rooms.get(
-                  room.id
-                ) === room
-              ) {
-                sendNextRound(
-                  room
-                );
-              }
-            },
-            2200
-          );
-
-          return;
-        }
-
-        if (
-          message.type ===
-            "next-round" &&
-          (
-            room.mode ===
-              "face" ||
-            room.mode ===
-              "pose"
-          )
-        ) {
-          room.nextReady.add(
-            ws.playerId
-          );
-
-          if (
-            room.nextReady
-              .size === 2
-          ) {
-            sendNextRound(
-              room
-            );
-          }
-
-          return;
-        }
-
-        if (
-          message.type ===
-            "chat-message" &&
-          room.mode ===
-            "chat"
-        ) {
-          const text =
-            String(
-              message.text ||
-              ""
-            ).slice(
-              0,
-              300
-            );
-
-          if (text) {
-            send(
-              opponent,
-              {
-                type:
-                  "chat-message",
-
-                text
-              }
-            );
-
-            send(
-              ws,
-              {
-                type:
-                  "chat-message",
-
-                text,
-
-                self:
-                  true
-              }
-            );
-          }
-
-          return;
-        }
-
-        if (
-          message.type ===
-            "signal" &&
-          opponent
-        ) {
-          send(
-            opponent,
-            {
-              type:
-                "signal",
-
-              signal:
-                message.signal,
-
-              from:
-                ws.playerId
-            }
-          );
-
-          return;
-        }
-      }
+  room.bestFaceRound =
+    room.bestFaceRound || {};
+
+  room.bestFaceRound[
+    ws.__playerId
+  ] =
+    Math.max(
+      room.bestFaceRound[
+        ws.__playerId
+      ] || 0,
+      score
     );
 
-    ws.on(
-      "close",
-      () => {
-        clients.delete(
-          ws
-        );
+  if (score >= 98) {
+    room.perfectFace =
+      room.perfectFace || {};
 
-        removeFromWaiting(
-          ws
-        );
+    room.perfectFace[
+      ws.__playerId
+    ] = true;
+  }
 
-        endRoom(
-          ws,
-          true
-        );
+  safeSend(
+    getClientByPlayerId(
+      ws.__playerId
+    ),
+    {
+      type: "your-score",
+      score
+    }
+  );
 
-        for (
-          const [
-            id,
-            invite
-          ] of pendingInvites
+  finishRoundIfBothScored(room);
+}
+
+function finishRoundIfBothScored(room) {
+  if (!room) return;
+
+  const aScore =
+    room.scores[
+      room.a.playerId
+    ];
+
+  const bScore =
+    room.scores[
+      room.b.playerId
+    ];
+
+  if (
+    typeof aScore !== "number" ||
+    typeof bScore !== "number"
+  ) {
+    return;
+  }
+
+  if (
+    room.mode === "face" ||
+    room.mode === "pose"
+  ) {
+    const bothHaveScores =
+      aScore >= 0 &&
+      bScore >= 0;
+
+    if (bothHaveScores) {
+      setTimeout(() => {
+        if (
+          rooms.has(room.id) &&
+          !room.completed
         ) {
-          if (
-            invite.from ===
-              ws.username ||
-            invite.to ===
-              ws.username
-          ) {
-            pendingInvites.delete(
-              id
-            );
-          }
+          finishRound(room);
         }
+      }, 700);
+    }
+  }
+}
 
-        broadcastOnline();
+function handlePoseScore(ws, message) {
+  const room =
+    rooms.get(ws.__roomId);
 
-        for (
-          const name of ensureSet(
-            friends,
-            ws.username
-          )
-        ) {
-          sendFriends(
-            name
-          );
-        }
+  if (!room) return;
+
+  if (
+    room.mode !== "pose" ||
+    room.completed
+  ) return;
+
+  const score =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(message.score) || 0
+      )
+    );
+
+  room.scores[
+    ws.__playerId
+  ] =
+    Math.max(
+      room.scores[
+        ws.__playerId
+      ] || 0,
+      score
+    );
+
+  finishRoundIfBothScored(room);
+}
+
+function handleHuntFound(ws) {
+  const room =
+    rooms.get(ws.__roomId);
+
+  if (!room) return;
+
+  if (
+    room.mode !== "hunt" ||
+    room.completed
+  ) return;
+
+  room.scores[
+    ws.__playerId
+  ] =
+    (room.scores[
+      ws.__playerId
+    ] || 0) + 1;
+
+  for (const player of [
+    room.a,
+    room.b
+  ]) {
+    safeSend(
+      getClientByPlayerId(
+        player.playerId
+      ),
+      {
+        type: "hunt-found",
+        playerId:
+          ws.__playerId,
+        username:
+          ws.username,
+        scores:
+          room.scores
       }
     );
   }
+
+  finishRound(room);
+}
+
+function handleLaugh(ws) {
+  const room =
+    rooms.get(ws.__roomId);
+
+  if (!room) return;
+
+  if (
+    room.mode !== "laugh" ||
+    room.completed
+  ) return;
+
+  const opponent =
+    otherPlayer(
+      room,
+      ws.__playerId
+    );
+
+  if (!opponent) return;
+
+  room.scores[
+    opponent.playerId
+  ] =
+    (room.scores[
+      opponent.playerId
+    ] || 0) + 1;
+
+  for (const player of [
+    room.a,
+    room.b
+  ]) {
+    safeSend(
+      getClientByPlayerId(
+        player.playerId
+      ),
+      {
+        type: "laugh-scored",
+        playerId:
+          opponent.playerId,
+        username:
+          opponent.username,
+        scores:
+          room.scores
+      }
+    );
+  }
+
+  finishRound(room);
+}
+
+function handleChatMessage(ws, message) {
+  const room =
+    rooms.get(ws.__roomId);
+
+  if (!room) return;
+
+  if (
+    room.mode !== "chat" ||
+    room.completed
+  ) return;
+
+  const text =
+    String(message.text || "")
+      .slice(0, 500);
+
+  if (!text) return;
+
+  const opponent =
+    otherPlayer(
+      room,
+      ws.__playerId
+    );
+
+  if (!opponent) return;
+
+  safeSend(
+    getClientByPlayerId(
+      opponent.playerId
+    ),
+    {
+      type: "chat-message",
+      username:
+        ws.username,
+      text
+    }
+  );
+}
+
+function explicitLeave(ws) {
+  removeFromWaiting(ws);
+
+  const room =
+    rooms.get(ws.__roomId);
+
+  if (room) {
+    const opponent =
+      otherPlayer(
+        room,
+        ws.__playerId
+      );
+
+    if (opponent) {
+      const opponentWs =
+        getClientByPlayerId(
+          opponent.playerId
+        );
+
+      safeSend(
+        opponentWs,
+        {
+          type: "opponent-left"
+        }
+      );
+    }
+
+    endRoom(room);
+  }
+
+  if (ws.sessionId) {
+    sessions.delete(
+      ws.sessionId
+    );
+  }
+
+  ws.__roomId = null;
+}
+
+wss.on("connection", ws => {
+  clients.add(ws);
+
+  ws.__playerId =
+    crypto.randomUUID();
+
+  ws.sessionId =
+    crypto.randomUUID();
+
+  ws.username =
+    "Player" +
+    Math.floor(
+      Math.random() * 10000
+    );
+
+  ws.__mode = null;
+  ws.__roomId = null;
+  ws.__intentionalClose = false;
+
+  safeSend(ws, {
+    type: "connected",
+    playerId:
+      ws.__playerId
+  });
+
+  ws.on("message", raw => {
+    let message;
+
+    try {
+      message =
+        JSON.parse(
+          raw.toString()
+        );
+    } catch {
+      return;
+    }
+
+    const type =
+      message.type;
+
+    if (type === "set-username") {
+      const oldUsername =
+        ws.username;
+
+      const username =
+        String(
+          message.username ||
+          ""
+        )
+          .trim()
+          .slice(0, 24);
+
+      if (username) {
+        ws.username =
+          username;
+      }
+
+      if (message.sessionId) {
+        ws.sessionId =
+          String(
+            message.sessionId
+          );
+
+        const existing =
+          sessions.get(
+            ws.sessionId
+          );
+
+        if (existing) {
+          ws.__playerId =
+            existing.playerId;
+
+          ws.username =
+            existing.username ||
+            ws.username;
+
+          const room =
+            rooms.get(
+              existing.roomId
+            );
+
+          if (room) {
+            ws.__roomId =
+              room.id;
+
+            sendRoomState(
+              room
+            );
+          }
+        }
+      }
+
+      ensureProfile(
+        ws.username
+      );
+
+      if (
+        oldUsername !==
+        ws.username
+      ) {
+        sendProfile(
+          ws.username
+        );
+      }
+
+      safeSend(ws, {
+        type: "username-saved",
+        username:
+          ws.username
+      });
+
+      sendFriends(
+        ws.username
+      );
+
+      broadcast({
+        type: "online-count",
+        count:
+          clients.size
+      });
+
+      broadcastLeaderboards();
+
+      return;
+    }
+
+    if (type === "get-profile") {
+      sendProfile(
+        ws.username
+      );
+      return;
+    }
+
+    if (type === "get-friends") {
+      sendFriends(
+        ws.username
+      );
+      return;
+    }
+
+    if (type === "friend-request") {
+      const target =
+        String(
+          message.username ||
+          ""
+        )
+          .trim()
+          .slice(0, 24);
+
+      if (
+        !target ||
+        target === ws.username
+      ) {
+        safeSend(ws, {
+          type: "friend-result",
+          ok: false,
+          message:
+            "Invalid username."
+        });
+        return;
+      }
+
+      const targetExists =
+        [...clients].some(
+          c =>
+            c.username ===
+            target
+        );
+
+      if (!targetExists) {
+        safeSend(ws, {
+          type: "friend-result",
+          ok: false,
+          message:
+            "That player is not online."
+        });
+        return;
+      }
+
+      if (
+        ensureFriends(
+          ws.username
+        ).has(target)
+      ) {
+        safeSend(ws, {
+          type: "friend-result",
+          ok: false,
+          message:
+            "You are already friends."
+        });
+        return;
+      }
+
+      ensureRequests(
+        target
+      ).add(
+        ws.username
+      );
+
+      safeSend(ws, {
+        type: "friend-result",
+        ok: true,
+        message:
+          "Friend request sent!"
+      });
+
+      send(
+        target,
+        {
+          type:
+            "friend-request-received",
+          username:
+            ws.username
+        }
+      );
+
+      sendFriends(target);
+
+      return;
+    }
+
+    if (type === "friend-accept") {
+      const requester =
+        String(
+          message.username ||
+          ""
+        )
+          .trim()
+          .slice(0, 24);
+
+      if (
+        !ensureRequests(
+          ws.username
+        ).has(requester)
+      ) {
+        safeSend(ws, {
+          type: "friend-result",
+          ok: false,
+          message:
+            "Friend request not found."
+        });
+        return;
+      }
+
+      addFriend(
+        ws.username,
+        requester
+      );
+
+      safeSend(ws, {
+        type: "friend-result",
+        ok: true,
+        message:
+          "Friend request accepted!"
+      });
+
+      return;
+    }
+
+    if (type === "find-match") {
+      const mode =
+        String(
+          message.mode || ""
+        );
+
+      if (
+        ![
+          "face",
+          "hunt",
+          "chat",
+          "pose",
+          "laugh"
+        ].includes(mode)
+      ) {
+        return;
+      }
+
+      findMatch(
+        ws,
+        mode
+      );
+
+      return;
+    }
+
+    if (type === "face-score") {
+      handleFaceScore(
+        ws,
+        message
+      );
+      return;
+    }
+
+    if (type === "pose-score") {
+      handlePoseScore(
+        ws,
+        message
+      );
+      return;
+    }
+
+    if (type === "hunt-found") {
+      handleHuntFound(ws);
+      return;
+    }
+
+    if (type === "laugh") {
+      handleLaugh(ws);
+      return;
+    }
+
+    if (type === "chat-message") {
+      handleChatMessage(
+        ws,
+        message
+      );
+      return;
+    }
+
+    if (type === "skip") {
+      const room =
+        rooms.get(
+          ws.__roomId
+        );
+
+      if (room) {
+        const opponent =
+          otherPlayer(
+            room,
+            ws.__playerId
+          );
+
+        if (opponent) {
+          const opponentWs =
+            getClientByPlayerId(
+              opponent.playerId
+            );
+
+          safeSend(
+            opponentWs,
+            {
+              type:
+                "opponent-skipped"
+            }
+          );
+        }
+
+        endRoom(room);
+      }
+
+      requeueAfterSkip(ws);
+
+      return;
+    }
+
+    if (type === "leave") {
+      ws.__intentionalClose =
+        true;
+
+      explicitLeave(ws);
+
+      return;
+    }
+
+    if (type === "report") {
+      const reason =
+        String(
+          message.reason ||
+          "Other"
+        )
+          .slice(0, 200);
+
+      reports.push({
+        id:
+          crypto.randomUUID(),
+        from:
+          ws.username,
+        reason,
+        createdAt:
+          new Date().toISOString()
+      });
+
+      if (
+        reports.length >
+        MAX_REPORTS
+      ) {
+        reports.shift();
+      }
+
+      safeSend(ws, {
+        type: "report-result",
+        ok: true,
+        message:
+          "Report submitted."
+      });
+
+      return;
+    }
+
+    if (type === "dm-send") {
+      const to =
+        String(
+          message.to || ""
+        )
+          .trim()
+          .slice(0, 24);
+
+      const text =
+        String(
+          message.text || ""
+        )
+          .slice(0, 500);
+
+      if (!to || !text) return;
+
+      const key =
+        [ws.username, to]
+          .sort()
+          .join("|");
+
+      if (
+        !dmHistory.has(key)
+      ) {
+        dmHistory.set(
+          key,
+          []
+        );
+      }
+
+      const history =
+        dmHistory.get(key);
+
+      history.push({
+        from:
+          ws.username,
+        to,
+        text,
+        time:
+          new Date().toISOString()
+      });
+
+      if (history.length > 100) {
+        history.shift();
+      }
+
+      send(to, {
+        type: "dm-message",
+        from:
+          ws.username,
+        text
+      });
+
+      return;
+    }
+
+    if (type === "dm-history") {
+      const other =
+        String(
+          message.username ||
+          ""
+        )
+          .trim()
+          .slice(0, 24);
+
+      const key =
+        [ws.username, other]
+          .sort()
+          .join("|");
+
+      safeSend(ws, {
+        type: "dm-history",
+        username: other,
+        messages:
+          dmHistory.get(key) ||
+          []
+      });
+
+      return;
+    }
+
+    if (type === "invite") {
+      const target =
+        String(
+          message.username ||
+          ""
+        )
+          .trim()
+          .slice(0, 24);
+
+      if (!target) return;
+
+      const inviteId =
+        crypto.randomUUID();
+
+      pendingInvites.set(
+        inviteId,
+        {
+          from:
+            ws.username,
+          to: target,
+          mode:
+            message.mode || "face",
+          createdAt:
+            Date.now()
+        }
+      );
+
+      send(target, {
+        type: "invite-received",
+        inviteId,
+        from:
+          ws.username,
+        mode:
+          message.mode || "face"
+      });
+
+      return;
+    }
+
+    if (type === "invite-accept") {
+      const invite =
+        pendingInvites.get(
+          message.inviteId
+        );
+
+      if (!invite) return;
+
+      pendingInvites.delete(
+        message.inviteId
+      );
+
+      const inviter =
+        [...clients].find(
+          c =>
+            c.username ===
+            invite.from
+        );
+
+      if (!inviter) return;
+
+      removeFromWaiting(
+        ws
+      );
+
+      removeFromWaiting(
+        inviter
+      );
+
+      startMatch(
+        inviter,
+        ws,
+        invite.mode
+      );
+
+      return;
+    }
+  });
+
+  ws.on("close", () => {
+    clients.delete(ws);
+
+    removeFromWaiting(ws);
+
+    broadcast({
+      type: "online-count",
+      count:
+        clients.size
+    });
+
+    /*
+      IMPORTANT:
+
+      If the connection disappears unexpectedly,
+      DO NOT destroy the room.
+
+      The player's session remains alive so they
+      can reconnect and return to the same game.
+    */
+
+    if (
+      !ws.__intentionalClose &&
+      ws.__roomId
+    ) {
+      const room =
+        rooms.get(
+          ws.__roomId
+        );
+
+      if (room) {
+        room.disconnected.add(
+          ws.__playerId
+        );
+
+        const opponent =
+          otherPlayer(
+            room,
+            ws.__playerId
+          );
+
+        if (opponent) {
+          safeSend(
+            getClientByPlayerId(
+              opponent.playerId
+            ),
+            {
+              type:
+                "opponent-temporarily-disconnected"
+            }
+          );
+        }
+      }
+
+      return;
+    }
+
+    if (
+      ws.__intentionalClose
+    ) {
+      return;
+    }
+
+    if (ws.sessionId) {
+      const session =
+        sessions.get(
+          ws.sessionId
+        );
+
+      if (!session) {
+        return;
+      }
+    }
+  });
+});
+
+app.use(
+  express.static(
+    path.join(
+      __dirname,
+      "public"
+    )
+  )
 );
 
-const PORT =
-  process.env.PORT ||
-  3000;
+app.get(
+  "*",
+  (req, res) => {
+    res.sendFile(
+      path.join(
+        __dirname,
+        "public",
+        "index.html"
+      )
+    );
+  }
+);
 
 server.listen(
   PORT,
   "0.0.0.0",
   () => {
     console.log(
-      `EmojiTV running on port ${PORT}`
+      `EmojiTV server running on port ${PORT}`
     );
   }
 );
