@@ -13,70 +13,201 @@ const wss = new WebSocketServer({ server });
 const waiting = [];
 const rooms = new Map();
 const clients = new Set();
-const leaderboard = { face: new Map(), hunt: new Map(), chat: new Map() };
+
+const leaderboard = {
+  face: new Map(),
+  hunt: new Map(),
+  chat: new Map()
+};
+
 const reports = [];
 const MAX_REPORTS = 5000;
+
 const friends = new Map();
 const friendRequests = new Map();
 const dmHistory = new Map();
 const pendingInvites = new Map();
+
 const profiles = new Map();
 
 const XP_PER_LEVEL = 500;
 
 const DAILY_CHALLENGES = [
-  { id: "play-3", event: "game", title: "Play 3 games", target: 3, reward: 100 },
-  { id: "win-1", event: "win", title: "Win 1 game", target: 1, reward: 150 },
-  { id: "score-80", event: "score80", title: "Score 80+ in a Face-Off round", target: 1, reward: 200 },
-  { id: "hunt-3", event: "hunt", title: "Find 3 Hunt items", target: 3, reward: 150 },
-  { id: "streak-3", event: "streak", title: "Reach a 3-win streak", target: 3, reward: 250 },
-  { id: "friends-5", event: "friend", title: "Make 5 friends", target: 5, reward: 200 }
+  {
+    id: "play-3",
+    event: "game",
+    title: "Play 3 games",
+    target: 3,
+    reward: 100
+  },
+  {
+    id: "win-1",
+    event: "win",
+    title: "Win 1 game",
+    target: 1,
+    reward: 150
+  },
+  {
+    id: "score-80",
+    event: "score80",
+    title: "Score 80+ in a Face-Off round",
+    target: 1,
+    reward: 200
+  },
+  {
+    id: "hunt-3",
+    event: "hunt",
+    title: "Find 3 Hunt items",
+    target: 3,
+    reward: 150
+  },
+  {
+    id: "streak-3",
+    event: "streak",
+    title: "Reach a 3-win streak",
+    target: 3,
+    reward: 250
+  },
+  {
+    id: "friends-5",
+    event: "friend",
+    title: "Make 5 friends",
+    target: 5,
+    reward: 200
+  }
 ];
 
 const EMOJIS = [
-  "😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇","🙂","🙃","😉","😌",
-  "😍","🥰","😘","😗","😙","😚","😋","😛","😝","😜","🤪","🤨","🧐","🤓",
-  "😎","🤩","🥳","🤗","🫠","🫡","🤔","🫢","🫣","🫤","🫥","😐","😑","😶",
-  "🫨","😏","😒","🙄","😬","🤥","😶‍🌫️","😴","🤤","😪","😵","😵‍💫","🤐",
-  "🤢","🤮","🤧","😷","🤒","🤕","🥴","🥶","🥵","😳","😯","😦","😧","😟",
-  "😕","🙁","☹️","😞","😔","😢","😭","😥","😓","😰","😨","😱","😖","😣",
-  "😫","😩","🥺","🥹","😠","😡","🤬","😤","😮‍💨","😮","😲","🤯","🤭","🤫",
-  "🤠","🥸","😈","👿","💀","☠️","👻","👽","🤖","🎃","😺","😸","😹","😻",
-  "😼","😽","🙀","😿","😾"
+  "😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇",
+  "🙂","🙃","😉","😌","😍","🥰","😘","😗","😙","😚",
+  "😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🤩",
+  "🥳","🤗","🫠","🫡","🤔","🫢","🫣","🫤","🫥","😐",
+  "😑","😶","🫨","😏","😒","🙄","😬","🤥","😶‍🌫️","😴",
+  "🤤","😪","😵","😵‍💫","🤐","🤢","🤮","🤧","😷","🤒",
+  "🤕","🥴","🥶","🥵","😳","😯","😦","😧","😟","😕",
+  "🙁","☹️","😞","😔","😢","😭","😥","😓","😰","😨",
+  "😱","😖","😣","😫","😩","🥺","🥹","😠","😡","🤬",
+  "😤","😮‍💨","😮","😲","🤯","🤭","🤫","🤠","🥸","😈",
+  "👿","💀","☠️","👻","👽","🤖","🎃","😺","😸","😹",
+  "😻","😼","😽","🙀","😿","😾"
 ];
 
 const HUNT_ITEMS = [
-  { emoji: "🧻", label: "toilet paper", aliases: ["toilet paper", "a roll of toilet paper"] },
-  { emoji: "🍎", label: "apple", aliases: ["an apple", "a red apple", "apple"] },
-  { emoji: "🍌", label: "banana", aliases: ["a banana", "banana"] },
-  { emoji: "🥤", label: "cup", aliases: ["a cup", "a drinking cup", "plastic cup"] },
-  { emoji: "🧴", label: "bottle", aliases: ["a bottle", "a plastic bottle", "water bottle"] },
-  { emoji: "📕", label: "book", aliases: ["a book", "a red book"] },
-  { emoji: "🥄", label: "spoon", aliases: ["a spoon", "a metal spoon"] },
-  { emoji: "🧸", label: "teddy bear", aliases: ["a teddy bear", "a stuffed bear", "stuffed animal"] },
-  { emoji: "📱", label: "cell phone", aliases: ["a cell phone", "a smartphone", "a phone"] },
-  { emoji: "🪥", label: "toothbrush", aliases: ["a toothbrush", "toothbrush"] },
-  { emoji: "🎧", label: "headphones", aliases: ["headphones", "a pair of headphones"] },
-  { emoji: "🕶️", label: "sunglasses", aliases: ["sunglasses", "a pair of sunglasses"] },
-  { emoji: "⚽", label: "soccer ball", aliases: ["a soccer ball", "soccer ball"] },
-  { emoji: "🏀", label: "basketball", aliases: ["a basketball", "basketball"] },
-  { emoji: "🎮", label: "game controller", aliases: ["a game controller", "controller"] },
-  { emoji: "⌚", label: "watch", aliases: ["a watch", "smartwatch"] },
-  { emoji: "✏️", label: "pencil", aliases: ["a pencil", "pencil"] },
-  { emoji: "🖊️", label: "pen", aliases: ["a pen", "pen"] },
-  { emoji: "🧢", label: "cap", aliases: ["a cap", "a baseball cap", "hat"] },
-  { emoji: "👟", label: "shoe", aliases: ["a shoe", "sneaker"] }
+  {
+    emoji: "🧻",
+    label: "toilet paper",
+    aliases: ["toilet paper", "a roll of toilet paper"]
+  },
+  {
+    emoji: "🍎",
+    label: "apple",
+    aliases: ["an apple", "a red apple", "apple"]
+  },
+  {
+    emoji: "🍌",
+    label: "banana",
+    aliases: ["a banana", "banana"]
+  },
+  {
+    emoji: "🥤",
+    label: "cup",
+    aliases: ["a cup", "a drinking cup", "plastic cup"]
+  },
+  {
+    emoji: "🧴",
+    label: "bottle",
+    aliases: ["a bottle", "a plastic bottle", "water bottle"]
+  },
+  {
+    emoji: "📕",
+    label: "book",
+    aliases: ["a book", "a red book"]
+  },
+  {
+    emoji: "🥄",
+    label: "spoon",
+    aliases: ["a spoon", "a metal spoon"]
+  },
+  {
+    emoji: "🧸",
+    label: "teddy bear",
+    aliases: ["a teddy bear", "a stuffed bear", "stuffed animal"]
+  },
+  {
+    emoji: "📱",
+    label: "cell phone",
+    aliases: ["a cell phone", "a smartphone", "a phone"]
+  },
+  {
+    emoji: "🪥",
+    label: "toothbrush",
+    aliases: ["a toothbrush", "toothbrush"]
+  },
+  {
+    emoji: "🎧",
+    label: "headphones",
+    aliases: ["headphones", "a pair of headphones"]
+  },
+  {
+    emoji: "🕶️",
+    label: "sunglasses",
+    aliases: ["sunglasses", "a pair of sunglasses"]
+  },
+  {
+    emoji: "⚽",
+    label: "soccer ball",
+    aliases: ["a soccer ball", "soccer ball"]
+  },
+  {
+    emoji: "🏀",
+    label: "basketball",
+    aliases: ["a basketball", "basketball"]
+  },
+  {
+    emoji: "🎮",
+    label: "game controller",
+    aliases: ["a game controller", "controller"]
+  },
+  {
+    emoji: "⌚",
+    label: "watch",
+    aliases: ["a watch", "smartwatch"]
+  },
+  {
+    emoji: "✏️",
+    label: "pencil",
+    aliases: ["a pencil", "pencil"]
+  },
+  {
+    emoji: "🖊️",
+    label: "pen",
+    aliases: ["a pen", "pen"]
+  },
+  {
+    emoji: "🧢",
+    label: "cap",
+    aliases: ["a cap", "a baseball cap", "hat"]
+  },
+  {
+    emoji: "👟",
+    label: "shoe",
+    aliases: ["a shoe", "sneaker"]
+  }
 ];
 
 const TOTAL_FACE_ROUNDS = 5;
 const TOTAL_HUNT_ROUNDS = 10;
+
 const HUNT_SECONDS = 60;
 const HUNT_TIMEOUT_MS = HUNT_SECONDS * 1000;
 
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/health", (_, res) => {
-  res.json({ ok: true, game: "EmojiTV" });
+  res.json({
+    ok: true,
+    game: "EmojiTV"
+  });
 });
 
 function send(ws, data) {
@@ -117,24 +248,39 @@ function randomItem(list) {
 }
 
 function modeRounds(mode) {
-  return mode === "hunt" ? TOTAL_HUNT_ROUNDS : TOTAL_FACE_ROUNDS;
+  return mode === "hunt"
+    ? TOTAL_HUNT_ROUNDS
+    : TOTAL_FACE_ROUNDS;
 }
 
 function nextUnique(list, used) {
-  const available = list.filter(x => {
-    const key = typeof x === "string" ? x : x.emoji;
+  const available = list.filter(item => {
+    const key =
+      typeof item === "string"
+        ? item
+        : item.emoji;
+
     return !used.has(key);
   });
 
-  const pick = randomItem(available.length ? available : list);
+  const pick = randomItem(
+    available.length ? available : list
+  );
 
-  used.add(typeof pick === "string" ? pick : pick.emoji);
+  const key =
+    typeof pick === "string"
+      ? pick
+      : pick.emoji;
+
+  used.add(key);
 
   return pick;
 }
 
 function nextHuntTarget(used) {
-  return { ...nextUnique(HUNT_ITEMS, used) };
+  return {
+    ...nextUnique(HUNT_ITEMS, used)
+  };
 }
 
 function pairKey(a, b) {
@@ -154,14 +300,21 @@ function isFriend(a, b) {
 }
 
 function friendPayload(username) {
-  const list = [...ensureSet(friends, username)];
-  const pending = [...ensureSet(friendRequests, username)];
+  const list = [
+    ...ensureSet(friends, username)
+  ];
+
+  const pending = [
+    ...ensureSet(friendRequests, username)
+  ];
 
   return {
     type: "friends",
     friends: list.map(name => ({
       username: name,
-      online: [...clients].some(c => c.username === name)
+      online: [...clients].some(
+        c => c.username === name
+      )
     })),
     pending
   };
@@ -176,14 +329,15 @@ function sendFriends(username) {
 }
 
 function sendDmHistory(a, b) {
-  const h = dmHistory.get(pairKey(a, b)) || [];
+  const history =
+    dmHistory.get(pairKey(a, b)) || [];
 
   for (const c of clients) {
     if (c.username === a) {
       send(c, {
         type: "dm-history",
         with: b,
-        messages: h.slice(-100)
+        messages: history.slice(-100)
       });
     }
   }
@@ -191,26 +345,30 @@ function sendDmHistory(a, b) {
 
 function addDm(a, b, text) {
   const key = pairKey(a, b);
-  const h = dmHistory.get(key) || [];
 
-  h.push({
+  const history =
+    dmHistory.get(key) || [];
+
+  history.push({
     from: a,
     to: b,
     text,
     createdAt: new Date().toISOString()
   });
 
-  if (h.length > 200) {
-    h.shift();
+  if (history.length > 200) {
+    history.shift();
   }
 
-  dmHistory.set(key, h);
+  dmHistory.set(key, history);
 }
 
 function onlinePayload() {
   const names = [...clients]
     .map(ws => ws.username || "Guest")
-    .sort((a, b) => a.localeCompare(b));
+    .sort((a, b) =>
+      a.localeCompare(b)
+    );
 
   return {
     type: "online-list",
@@ -228,16 +386,23 @@ function broadcastOnline() {
 }
 
 function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  return new Date()
+    .toISOString()
+    .slice(0, 10);
 }
 
 function challengeSetForToday() {
   const day = Math.floor(
-    Date.parse(todayKey() + "T00:00:00Z") / 86400000
+    Date.parse(
+      todayKey() + "T00:00:00Z"
+    ) / 86400000
   );
 
-  return [0, 1, 2].map(
-    i => DAILY_CHALLENGES[(day + i) % DAILY_CHALLENGES.length]
+  return [0, 1, 2].map(i =>
+    DAILY_CHALLENGES[
+      (day + i) %
+      DAILY_CHALLENGES.length
+    ]
   );
 }
 
@@ -270,76 +435,127 @@ function ensureProfile(username) {
     };
   }
 
-  profile.level = Math.floor(profile.xp / XP_PER_LEVEL) + 1;
+  profile.level =
+    Math.floor(
+      profile.xp / XP_PER_LEVEL
+    ) + 1;
 
   return profile;
 }
 
 function addXp(profile, amount) {
-  profile.xp += Math.max(0, Math.round(amount));
-  profile.level = Math.floor(profile.xp / XP_PER_LEVEL) + 1;
+  profile.xp += Math.max(
+    0,
+    Math.round(amount)
+  );
+
+  profile.level =
+    Math.floor(
+      profile.xp / XP_PER_LEVEL
+    ) + 1;
 }
 
 function ensureStats(mode, username) {
   if (!leaderboard[mode].has(username)) {
-    leaderboard[mode].set(username, {
+    leaderboard[mode].set(
       username,
-      wins: 0,
-      points: 0,
-      games: 0
-    });
+      {
+        username,
+        wins: 0,
+        points: 0,
+        games: 0
+      }
+    );
   }
 
   return leaderboard[mode].get(username);
 }
 
 function dailyPayload(username) {
-  const profile = ensureProfile(username);
-  const defs = challengeSetForToday();
+  const profile =
+    ensureProfile(username);
+
+  const definitions =
+    challengeSetForToday();
 
   return {
     date: profile.daily.date,
 
-    challenges: defs.map(c => ({
-      ...c,
-      progress: Math.min(
-        c.target,
-        Number(profile.daily.progress[c.id] || 0)
-      ),
-      completed: profile.daily.completed.includes(c.id)
-    }))
+    challenges:
+      definitions.map(challenge => ({
+        ...challenge,
+
+        progress: Math.min(
+          challenge.target,
+          Number(
+            profile.daily.progress[
+              challenge.id
+            ] || 0
+          )
+        ),
+
+        completed:
+          profile.daily.completed.includes(
+            challenge.id
+          )
+      }))
   };
 }
 
 function profilePayload(username) {
-  const p = ensureProfile(username);
+  const profile =
+    ensureProfile(username);
 
   return {
     type: "profile",
-    username: p.username,
-    xp: p.xp,
-    level: p.level,
-    xpIntoLevel: p.xp % XP_PER_LEVEL,
-    xpToNextLevel: XP_PER_LEVEL - (p.xp % XP_PER_LEVEL),
-    streak: p.streak,
-    bestStreak: p.bestStreak,
-    gamesPlayed: p.gamesPlayed,
-    wins: p.wins,
-    badges: [...p.badges],
-    daily: dailyPayload(username)
+
+    username: profile.username,
+
+    xp: profile.xp,
+
+    level: profile.level,
+
+    xpIntoLevel:
+      profile.xp % XP_PER_LEVEL,
+
+    xpToNextLevel:
+      XP_PER_LEVEL -
+      (profile.xp % XP_PER_LEVEL),
+
+    streak: profile.streak,
+
+    bestStreak:
+      profile.bestStreak,
+
+    gamesPlayed:
+      profile.gamesPlayed,
+
+    wins:
+      profile.wins,
+
+    badges: [
+      ...profile.badges
+    ],
+
+    daily:
+      dailyPayload(username)
   };
 }
 
 function sendProfile(username) {
   for (const c of clients) {
     if (c.username === username) {
-      send(c, profilePayload(username));
+      send(
+        c,
+        profilePayload(username)
+      );
     }
   }
 }
 
 function badgeCheck(profile) {
-  const earned = new Set(profile.badges);
+  const earned =
+    new Set(profile.badges);
 
   if (profile.wins >= 1) {
     earned.add("first-win");
@@ -357,52 +573,97 @@ function badgeCheck(profile) {
     earned.add("games-100");
   }
 
-  const hunt = leaderboard.hunt.get(profile.username);
+  const hunt =
+    leaderboard.hunt.get(
+      profile.username
+    );
 
   if (hunt && hunt.wins >= 1) {
     earned.add("hunt-master");
   }
 
-  if (ensureSet(friends, profile.username).size >= 10) {
+  if (
+    ensureSet(
+      friends,
+      profile.username
+    ).size >= 10
+  ) {
     earned.add("friends-10");
   }
 
   profile.badges = earned;
 }
 
-function updateDaily(username, event, amount = 1) {
-  const p = ensureProfile(username);
-  const defs = challengeSetForToday();
+function updateDaily(
+  username,
+  event,
+  amount = 1
+) {
+  const profile =
+    ensureProfile(username);
+
+  const definitions =
+    challengeSetForToday();
 
   let changed = false;
 
-  for (const c of defs) {
-    if (c.event !== event || p.daily.completed.includes(c.id)) {
+  for (const challenge of definitions) {
+    if (
+      challenge.event !== event ||
+      profile.daily.completed.includes(
+        challenge.id
+      )
+    ) {
       continue;
     }
 
-    const current = Number(p.daily.progress[c.id] || 0);
+    const current =
+      Number(
+        profile.daily.progress[
+          challenge.id
+        ] || 0
+      );
 
     const next =
-      c.event === "streak"
+      challenge.event === "streak"
         ? Math.max(current, amount)
         : current + amount;
 
-    p.daily.progress[c.id] = Math.min(c.target, next);
+    profile.daily.progress[
+      challenge.id
+    ] = Math.min(
+      challenge.target,
+      next
+    );
 
     changed = true;
 
-    if (p.daily.progress[c.id] >= c.target) {
-      p.daily.completed.push(c.id);
+    if (
+      profile.daily.progress[
+        challenge.id
+      ] >= challenge.target
+    ) {
+      profile.daily.completed.push(
+        challenge.id
+      );
 
-      addXp(p, c.reward);
+      addXp(
+        profile,
+        challenge.reward
+      );
 
-      send(p.username, {
-        type: "daily-complete",
-        challengeId: c.id,
-        title: c.title,
-        reward: c.reward
-      });
+      send(
+        profile.username,
+        {
+          type: "daily-complete",
+          challengeId:
+            challenge.id,
+          title:
+            challenge.title,
+          reward:
+            challenge.reward
+        }
+      );
     }
   }
 
@@ -410,10 +671,121 @@ function updateDaily(username, event, amount = 1) {
 }
 
 function updateProfileAndSend(username) {
-  const p = ensureProfile(username);
+  const profile =
+    ensureProfile(username);
 
-  badgeCheck(p);
+  badgeCheck(profile);
+
   sendProfile(username);
+}
+
+function leaderboardPayload(mode) {
+  const rows = [
+    ...leaderboard[mode].values()
+  ]
+    .sort((a, b) => {
+      if (b.wins !== a.wins) {
+        return b.wins - a.wins;
+      }
+
+      if (b.points !== a.points) {
+        return b.points - a.points;
+      }
+
+      return a.username.localeCompare(
+        b.username
+      );
+    })
+    .slice(0, 20)
+    .map((row, index) => ({
+      rank: index + 1,
+      username: row.username,
+      wins: row.wins,
+      points: row.points,
+      games: row.games
+    }));
+
+  return {
+    type: "leaderboard",
+    mode,
+    rows
+  };
+}
+
+function xpLeaderboardPayload() {
+  const rows = [
+    ...profiles.values()
+  ]
+    .sort((a, b) => {
+      if (b.xp !== a.xp) {
+        return b.xp - a.xp;
+      }
+
+      if (b.level !== a.level) {
+        return b.level - a.level;
+      }
+
+      if (b.wins !== a.wins) {
+        return b.wins - a.wins;
+      }
+
+      return a.username.localeCompare(
+        b.username
+      );
+    })
+    .slice(0, 20)
+    .map((profile, index) => ({
+      rank: index + 1,
+      username: profile.username,
+      xp: profile.xp,
+      level: profile.level,
+      streak: profile.streak
+    }));
+
+  return {
+    type: "leaderboard",
+    mode: "xp",
+    rows
+  };
+}
+
+function broadcastLeaderboards() {
+  for (const mode of [
+    "face",
+    "hunt",
+    "chat"
+  ]) {
+    broadcast(
+      leaderboardPayload(mode)
+    );
+  }
+
+  broadcast(
+    xpLeaderboardPayload()
+  );
+}
+
+function awardGameXp(
+  profile,
+  mode,
+  score,
+  won
+) {
+  let xp = 50;
+
+  if (won) {
+    xp += 100;
+  }
+
+  if (mode === "face") {
+    xp += Math.round(score * 0.5);
+  }
+
+  if (mode === "hunt") {
+    xp += score * 10;
+  }
+
+  addXp(profile, xp);
 }
 
 function applyGameResult(room) {
@@ -423,11 +795,18 @@ function applyGameResult(room) {
 
   room.completed = true;
 
-  const players = [room.a, room.b];
+  const players = [
+    room.a,
+    room.b
+  ];
+
   const scores = room.scores;
 
-  const aScore = scores[room.a.playerId] || 0;
-  const bScore = scores[room.b.playerId] || 0;
+  const aScore =
+    scores[room.a.playerId] || 0;
+
+  const bScore =
+    scores[room.b.playerId] || 0;
 
   const winnerIds =
     aScore === bScore
@@ -439,55 +818,58 @@ function applyGameResult(room) {
         ]);
 
   for (const player of players) {
-    const stats = ensureStats(room.mode, player.username);
+    const stats = ensureStats(
+      room.mode,
+      player.username
+    );
+
+    const playerScore =
+      scores[player.playerId] || 0;
 
     stats.games += 1;
-    stats.points += scores[player.playerId] || 0;
+    stats.points += playerScore;
 
-    const p = ensureProfile(player.username);
+    const profile =
+      ensureProfile(
+        player.username
+      );
 
-    p.gamesPlayed += 1;
+    profile.gamesPlayed += 1;
 
-    const won = winnerIds.has(player.playerId);
+    const won =
+      winnerIds.has(
+        player.playerId
+      );
 
     if (won) {
       stats.wins += 1;
 
-      p.wins += 1;
-      p.streak += 1;
+      profile.wins += 1;
 
-      p.bestStreak = Math.max(
-        p.bestStreak,
-        p.streak
+      profile.streak += 1;
+
+      profile.bestStreak =
+        Math.max(
+          profile.bestStreak,
+          profile.streak
+        );
+
+      updateDaily(
+        player.username,
+        "win",
+        1
       );
-    } else if (room.mode !== "chat") {
-      p.streak = 0;
-    }
 
-    let xp =
-      room.mode === "chat"
-        ? 25
-        : 30;
-
-    if (won) {
-      xp += 100;
-    }
-
-    if (room.mode === "face") {
-      xp += Math.min(
-        50,
-        Math.floor(
-          (scores[player.playerId] || 0) / 10
-        )
+      updateDaily(
+        player.username,
+        "streak",
+        profile.streak
       );
+    } else if (
+      room.mode !== "chat"
+    ) {
+      profile.streak = 0;
     }
-
-    if (room.mode === "hunt") {
-      xp +=
-        (scores[player.playerId] || 0) * 10;
-    }
-
-    addXp(p, xp);
 
     updateDaily(
       player.username,
@@ -495,55 +877,49 @@ function applyGameResult(room) {
       1
     );
 
-    if (won) {
-      updateDaily(
-        player.username,
-        "win",
-        1
-      );
-    }
-
-    if (
-      room.mode === "face" &&
-      (room.bestFaceRound?.[player.playerId] || 0) >= 80
-    ) {
-      updateDaily(
-        player.username,
-        "score80",
-        1
-      );
-    }
-
-    if (
-      room.mode === "face" &&
-      room.perfectFace?.[player.playerId]
-    ) {
-      ensureProfile(
-        player.username
-      ).badges.add("perfect-face");
-    }
-
     if (room.mode === "hunt") {
       updateDaily(
         player.username,
         "hunt",
-        scores[player.playerId] || 0
+        playerScore
       );
     }
 
-    if (room.mode !== "chat") {
-      updateDaily(
-        player.username,
-        "streak",
-        p.streak
+    if (room.mode === "face") {
+      const bestRound =
+        room.bestFaceRound?.[
+          player.playerId
+        ] || 0;
+
+      if (bestRound >= 80) {
+        updateDaily(
+          player.username,
+          "score80",
+          1
+        );
+      }
+    }
+
+    awardGameXp(
+      profile,
+      room.mode,
+      playerScore,
+      won
+    );
+
+    if (
+      room.mode === "face" &&
+      room.perfectFace?.[
+        player.playerId
+      ] === true
+    ) {
+      profile.badges.add(
+        "perfect-face"
       );
     }
 
-    badgeCheck(p);
-  }
-
-  for (const player of players) {
-    updateProfileAndSend(
+    badgeCheck(profile);
+    sendProfile(
       player.username
     );
   }
@@ -557,128 +933,117 @@ function applyGameResult(room) {
   };
 }
 
-function recordCompletedGame(room) {
-  return applyGameResult(room);
-}
+function startMatch(a, b, mode) {
+  removeFromWaiting(a);
+  removeFromWaiting(b);
 
-function leaderboardPayload(mode) {
-  const rows = [...leaderboard[mode].values()]
-    .sort(
-      (a, b) =>
-        b.wins - a.wins ||
-        b.points - a.points ||
-        a.username.localeCompare(b.username)
-    )
-    .slice(0, 20)
-    .map((x, i) => ({
-      rank: i + 1,
-      ...x
-    }));
+  a.queueMode = null;
+  b.queueMode = null;
 
-  return {
+  const roomId = createId();
+
+  const room = {
+    id: roomId,
+
     mode,
-    rows
+
+    a,
+    b,
+
+    round: 1,
+
+    totalRounds:
+      modeRounds(mode),
+
+    scores: {
+      [a.playerId]: 0,
+      [b.playerId]: 0
+    },
+
+    roundScores: {},
+
+    bestFaceRound: {
+      [a.playerId]: 0,
+      [b.playerId]: 0
+    },
+
+    perfectFace: {
+      [a.playerId]: true,
+      [b.playerId]: true
+    },
+
+    nextReady: new Set(),
+
+    skipReady: new Set(),
+
+    usedTargets: new Set(),
+
+    target:
+      mode === "hunt"
+        ? nextHuntTarget(
+            new Set()
+          )
+        : mode === "face"
+          ? nextUnique(
+              EMOJIS,
+              new Set()
+            )
+          : null,
+
+    huntFound: false,
+
+    huntStartedAt: null,
+
+    huntTimer: null,
+
+    rematchReady: new Set(),
+
+    completed: false
   };
-}
 
-function xpLeaderboardPayload() {
-  const rows = [...profiles.values()]
-    .sort(
-      (a, b) =>
-        b.xp - a.xp ||
-        b.level - a.level ||
-        b.wins - a.wins ||
-        a.username.localeCompare(b.username)
-    )
-    .slice(0, 20)
-    .map((x, i) => ({
-      rank: i + 1,
-      username: x.username,
-      xp: x.xp,
-      level: x.level,
-      streak: x.streak
-    }));
+  rooms.set(roomId, room);
 
-  return {
-    mode: "xp",
-    rows
+  a.roomId = roomId;
+  b.roomId = roomId;
+
+  a.opponentUsername =
+    b.username;
+
+  b.opponentUsername =
+    a.username;
+
+  const base = {
+    type: "match-started",
+    roomId,
+    mode,
+    totalRounds:
+      room.totalRounds,
+    round: 1
   };
-}
 
-function broadcastLeaderboards() {
-  for (const mode of ["face", "hunt", "chat"]) {
-    broadcast(
-      leaderboardPayload(mode)
-    );
+  send(a, {
+    ...base,
+    opponentUsername:
+      b.username,
+    target:
+      room.target
+  });
+
+  send(b, {
+    ...base,
+    opponentUsername:
+      a.username,
+    target:
+      room.target
+  });
+
+  if (mode === "hunt") {
+    scheduleHuntTimeout(room);
   }
-
-  broadcast(
-    xpLeaderboardPayload()
-  );
-}
-
-function endRoom(ws, notifyOpponent = true) {
-  removeFromWaiting(ws);
-
-  if (!ws.roomId) {
-    return null;
-  }
-
-  const roomId = ws.roomId;
-  const room = rooms.get(roomId);
-
-  if (!room) {
-    ws.roomId = null;
-    return null;
-  }
-
-  const opponent =
-    room.a === ws
-      ? room.b
-      : room.a;
-
-  if (room.huntTimer) {
-    clearTimeout(room.huntTimer);
-    room.huntTimer = null;
-  }
-
-  if (
-    room.mode === "chat" &&
-    !room.completed
-  ) {
-    applyGameResult(room);
-  }
-
-  if (
-    opponent &&
-    notifyOpponent
-  ) {
-    send(opponent, {
-      type: "opponent-disconnected",
-      reason: "opponent-left",
-      opponentUsername: ws.username
-    });
-  }
-
-  if (room.a) {
-    room.a.roomId = null;
-  }
-
-  if (room.b) {
-    room.b.roomId = null;
-  }
-
-  rooms.delete(roomId);
-
-  return opponent;
 }
 
 function putInQueue(ws, mode) {
   removeFromWaiting(ws);
-
-  if (ws.readyState !== 1) {
-    return;
-  }
 
   ws.queueMode = mode;
 
@@ -692,15 +1057,17 @@ function putInQueue(ws, mode) {
 
 function findWaitingOpponent(mode) {
   for (let i = 0; i < waiting.length; i++) {
-    const candidate = waiting[i];
+    const candidate =
+      waiting[i];
 
     if (
+      candidate &&
       candidate.readyState === 1 &&
-      candidate.queueMode === mode
+      candidate.queueMode === mode &&
+      !candidate.roomId
     ) {
       waiting.splice(i, 1);
       candidate.queueMode = null;
-
       return candidate;
     }
   }
@@ -708,229 +1075,278 @@ function findWaitingOpponent(mode) {
   return null;
 }
 
-function scheduleHuntTimeout(room) {
-  if (room.huntTimer) {
-    clearTimeout(room.huntTimer);
+function clearHuntTimer(room) {
+  if (room?.huntTimer) {
+    clearTimeout(
+      room.huntTimer
+    );
+
+    room.huntTimer = null;
   }
-
-  room.huntStartedAt = Date.now();
-
-  if (room.mode !== "hunt") {
-    return;
-  }
-
-  room.huntTimer = setTimeout(() => {
-    if (
-      rooms.get(room.id) !== room ||
-      room.huntFound
-    ) {
-      return;
-    }
-
-    room.huntFound = true;
-
-    send(room.a, {
-      type: "hunt-timeout",
-      round: room.round
-    });
-
-    send(room.b, {
-      type: "hunt-timeout",
-      round: room.round
-    });
-
-    sendNextRound(room);
-  }, HUNT_TIMEOUT_MS + 100);
 }
 
-function startMatch(
-  playerA,
-  playerB,
-  mode
-) {
-  const roomId = createId();
+function scheduleHuntTimeout(room) {
+  clearHuntTimer(room);
 
-  const target =
-    mode === "hunt"
-      ? nextHuntTarget(new Set())
-      : mode === "face"
-        ? nextUnique(
-            EMOJIS,
-            new Set()
-          )
-        : null;
+  room.huntStartedAt =
+    Date.now();
 
-  const rounds = modeRounds(mode);
+  room.huntTimer =
+    setTimeout(() => {
+      if (
+        rooms.get(room.id) !== room ||
+        room.completed ||
+        room.mode !== "hunt" ||
+        room.huntFound
+      ) {
+        return;
+      }
 
-  const room = {
-    id: roomId,
-    a: playerA,
-    b: playerB,
-    mode,
-    round: 1,
-    totalRounds: rounds,
-    target,
+      room.huntFound = true;
 
-    usedTargets: new Set(
-      target
-        ? [target.emoji || target]
-        : []
-    ),
+      send(
+        room.a,
+        {
+          type: "hunt-timeout",
+          round: room.round
+        }
+      );
 
-    scores: {
-      [playerA.playerId]: 0,
-      [playerB.playerId]: 0
-    },
+      send(
+        room.b,
+        {
+          type: "hunt-timeout",
+          round: room.round
+        }
+      );
 
-    roundScores: {},
-    bestFaceRound: {},
-
-    perfectFace: {
-      [playerA.playerId]: true,
-      [playerB.playerId]: true
-    },
-
-    nextReady: new Set(),
-    rematchReady: new Set(),
-    skipReady: new Set(),
-
-    huntFound: false,
-    completed: false,
-
-    huntTimer: null,
-    huntStartedAt: null
-  };
-
-  rooms.set(
-    roomId,
-    room
-  );
-
-  playerA.roomId = roomId;
-  playerB.roomId = roomId;
-
-  playerA.role = "a";
-  playerB.role = "b";
-
-  const base = {
-    type: "matched",
-    roomId,
-    round: 1,
-    totalRounds: rounds,
-    mode,
-    target
-  };
-
-  send(playerA, {
-    ...base,
-    role: "a",
-    opponentId: playerB.playerId,
-    opponentUsername: playerB.username
-  });
-
-  send(playerB, {
-    ...base,
-    role: "b",
-    opponentId: playerA.playerId,
-    opponentUsername: playerA.username
-  });
-
-  scheduleHuntTimeout(room);
+      sendNextRound(room);
+    }, HUNT_TIMEOUT_MS);
 }
 
 function sendNextRound(room) {
   if (
+    !room ||
+    room.completed
+  ) {
+    return;
+  }
+
+  clearHuntTimer(room);
+
+  if (
     room.round >=
     room.totalRounds
   ) {
-    recordCompletedGame(room);
+    const result =
+      applyGameResult(room);
 
-    send(room.a, {
-      type: "game-over",
-      mode: room.mode,
-      finalScores: room.scores
-    });
+    send(
+      room.a,
+      {
+        type: "game-complete",
+        mode: room.mode,
+        scores: room.scores,
+        result
+      }
+    );
 
-    send(room.b, {
-      type: "game-over",
-      mode: room.mode,
-      finalScores: room.scores
-    });
+    send(
+      room.b,
+      {
+        type: "game-complete",
+        mode: room.mode,
+        scores: room.scores,
+        result
+      }
+    );
 
     return;
   }
 
   room.round += 1;
 
-  room.nextReady.clear();
-  room.huntFound = false;
   room.roundScores = {};
 
-  room.target =
-    room.mode === "hunt"
-      ? nextHuntTarget(
-          room.usedTargets
-        )
-      : room.mode === "face"
-        ? nextUnique(
-            EMOJIS,
-            room.usedTargets
-          )
-        : null;
+  room.nextReady.clear();
 
-  const message = {
-    type: "new-round",
-    round: room.round,
-    totalRounds: room.totalRounds,
-    mode: room.mode,
-    target: room.target
-  };
+  room.skipReady.clear();
 
-  send(room.a, message);
-  send(room.b, message);
+  room.huntFound = false;
 
-  scheduleHuntTimeout(room);
+  if (room.mode === "hunt") {
+    room.target =
+      nextHuntTarget(
+        room.usedTargets
+      );
+  }
+
+  if (room.mode === "face") {
+    room.target =
+      nextUnique(
+        EMOJIS,
+        room.usedTargets
+      );
+  }
+
+  if (room.mode === "face") {
+    send(
+      room.a,
+      {
+        type: "new-round",
+        round: room.round,
+        totalRounds:
+          room.totalRounds,
+        mode: room.mode,
+        target: room.target
+      }
+    );
+
+    send(
+      room.b,
+      {
+        type: "new-round",
+        round: room.round,
+        totalRounds:
+          room.totalRounds,
+        mode: room.mode,
+        target: room.target
+      }
+    );
+  }
+
+  if (room.mode === "hunt") {
+    send(
+      room.a,
+      {
+        type: "new-round",
+        round: room.round,
+        totalRounds:
+          room.totalRounds,
+        mode: room.mode,
+        target: room.target
+      }
+    );
+
+    send(
+      room.b,
+      {
+        type: "new-round",
+        round: room.round,
+        totalRounds:
+          room.totalRounds,
+        mode: room.mode,
+        target: room.target
+      }
+    );
+
+    scheduleHuntTimeout(room);
+  }
+
+  if (room.mode === "chat") {
+    const result =
+      applyGameResult(room);
+
+    send(
+      room.a,
+      {
+        type: "game-complete",
+        mode: room.mode,
+        scores: room.scores,
+        result
+      }
+    );
+
+    send(
+      room.b,
+      {
+        type: "game-complete",
+        mode: room.mode,
+        scores: room.scores,
+        result
+      }
+    );
+  }
 }
 
-const HEARTBEAT_INTERVAL = 10000;
-
-const heartbeatTimer = setInterval(() => {
-  for (const ws of clients) {
-    if (ws.isAlive === false) {
-      try {
-        ws.terminate();
-      } catch {}
-
-      continue;
-    }
-
-    ws.isAlive = false;
-
-    try {
-      ws.ping();
-    } catch {}
+function endRoom(ws, notifyOpponent = true) {
+  if (!ws.roomId) {
+    return;
   }
-}, HEARTBEAT_INTERVAL);
+
+  const room =
+    rooms.get(ws.roomId);
+
+  if (!room) {
+    ws.roomId = null;
+    return;
+  }
+
+  clearHuntTimer(room);
+
+  const opponent =
+    room.a === ws
+      ? room.b
+      : room.a;
+
+  rooms.delete(room.id);
+
+  ws.roomId = null;
+  ws.queueMode = null;
+
+  if (opponent) {
+    opponent.roomId = null;
+
+    opponent.queueMode = null;
+
+    if (
+      notifyOpponent &&
+      opponent.readyState === 1
+    ) {
+      send(
+        opponent,
+        {
+          type:
+            "opponent-disconnected",
+          reason:
+            "opponent-left",
+          opponentUsername:
+            ws.username
+        }
+      );
+    }
+  }
+}
+
+function resetPlayerMatchState(ws) {
+  ws.roomId = null;
+  ws.queueMode = null;
+  ws.opponentUsername = null;
+}
 
 wss.on("connection", ws => {
-  ws.isAlive = true;
+  ws.playerId = createId();
 
-  ws.on("pong", () => {
-    ws.isAlive = true;
-  });
+  ws.username = "Guest";
+
+  ws.roomId = null;
+
+  ws.queueMode = null;
+
+  ws.opponentUsername = null;
+
+  ws.isAlive = true;
 
   clients.add(ws);
 
-  ws.playerId = createId();
-  ws.roomId = null;
-  ws.role = null;
-  ws.queueMode = null;
-  ws.username = "Guest";
+  ensureProfile(
+    ws.username
+  );
 
   send(ws, {
-    type: "ready",
-    playerId: ws.playerId,
-    username: ws.username
+    type: "connected",
+    playerId:
+      ws.playerId
   });
 
   send(
@@ -938,15 +1354,25 @@ wss.on("connection", ws => {
     onlinePayload()
   );
 
-  broadcastOnline();
+  send(
+    ws,
+    profilePayload(
+      ws.username
+    )
+  );
+
+  ws.on("pong", () => {
+    ws.isAlive = true;
+  });
 
   ws.on("message", raw => {
     let message;
 
     try {
-      message = JSON.parse(
-        raw.toString()
-      );
+      message =
+        JSON.parse(
+          raw.toString()
+        );
     } catch {
       return;
     }
@@ -958,36 +1384,36 @@ wss.on("connection", ws => {
       const oldName =
         ws.username;
 
-      ws.username =
+      const newName =
         cleanName(
           message.username
         );
 
-      ensureProfile(
-        ws.username
-      );
+      ws.username =
+        newName;
 
-      send(ws, {
-        type: "username-saved",
-        username: ws.username
-      });
+      ensureProfile(
+        newName
+      );
 
       send(
         ws,
-        profilePayload(
-          ws.username
-        )
+        {
+          type:
+            "username-set",
+          username:
+            newName
+        }
       );
 
-      if (
-        oldName !==
-        ws.username
-      ) {
-        broadcastOnline();
+      sendProfile(
+        newName
+      );
+
+      broadcastOnline();
+
+      if (oldName !== newName) {
         sendFriends(oldName);
-        sendFriends(
-          ws.username
-        );
       }
 
       return;
@@ -995,11 +1421,40 @@ wss.on("connection", ws => {
 
     if (
       message.type ===
-      "get-friends"
+      "get-profile"
     ) {
+      sendProfile(
+        ws.username
+      );
+
+      return;
+    }
+
+    if (
+      message.type ===
+      "get-leaderboards"
+    ) {
+      for (const mode of [
+        "face",
+        "hunt",
+        "chat"
+      ]) {
+        send(
+          ws,
+          leaderboardPayload(
+            mode
+          )
+        );
+      }
+
       send(
         ws,
-        friendPayload(
+        xpLeaderboardPayload()
+      );
+
+      send(
+        ws,
+        profilePayload(
           ws.username
         )
       );
@@ -1011,14 +1466,16 @@ wss.on("connection", ws => {
       message.type ===
       "friend-request"
     ) {
-      const to =
+      const targetName =
         cleanName(
+          message.username ||
           message.to
         );
 
       if (
-        !to ||
-        to === ws.username
+        !targetName ||
+        targetName ===
+          ws.username
       ) {
         return;
       }
@@ -1026,16 +1483,21 @@ wss.on("connection", ws => {
       const target =
         [...clients].find(
           c =>
-            c.username === to
+            c.username ===
+            targetName
         );
 
       if (!target) {
-        send(ws, {
-          type: "friend-result",
-          ok: false,
-          error:
-            "That player is not online."
-        });
+        send(
+          ws,
+          {
+            type:
+              "friend-result",
+            ok: false,
+            error:
+              "That player is not online."
+          }
+        );
 
         return;
       }
@@ -1043,44 +1505,53 @@ wss.on("connection", ws => {
       if (
         isFriend(
           ws.username,
-          to
+          targetName
         )
       ) {
-        send(ws, {
-          type: "friend-result",
-          ok: false,
-          error:
-            "You are already friends."
-        });
+        send(
+          ws,
+          {
+            type:
+              "friend-result",
+            ok: false,
+            error:
+              "You are already friends."
+          }
+        );
 
         return;
       }
 
       ensureSet(
         friendRequests,
-        to
+        targetName
       ).add(
         ws.username
       );
 
-      send(target, {
-        type:
-          "friend-request-received",
-        from:
-          ws.username
-      });
+      send(
+        target,
+        {
+          type:
+            "friend-request",
+          from:
+            ws.username
+        }
+      );
 
-      send(ws, {
-        type:
-          "friend-result",
-        ok: true,
-        message:
-          `Friend request sent to ${to}.`
-      });
+      send(
+        ws,
+        {
+          type:
+            "friend-result",
+          ok: true,
+          message:
+            `Friend request sent to ${targetName}.`
+        }
+      );
 
-      sendFriends(to);
       sendFriends(
-        ws.username
+        targetName
       );
 
       return;
@@ -1092,13 +1563,21 @@ wss.on("connection", ws => {
     ) {
       const from =
         cleanName(
+          message.username ||
           message.from
         );
 
-      ensureSet(
-        friendRequests,
-        ws.username
-      ).delete(from);
+      const requests =
+        ensureSet(
+          friendRequests,
+          ws.username
+        );
+
+      if (!requests.has(from)) {
+        return;
+      }
+
+      requests.delete(from);
 
       ensureSet(
         friends,
@@ -1108,9 +1587,7 @@ wss.on("connection", ws => {
       ensureSet(
         friends,
         from
-      ).add(
-        ws.username
-      );
+      ).add(ws.username);
 
       updateDaily(
         ws.username,
@@ -1118,31 +1595,84 @@ wss.on("connection", ws => {
         1
       );
 
-      badgeCheck(
-        ensureProfile(
-          ws.username
-        )
+      updateDaily(
+        from,
+        "friend",
+        1
       );
 
-      send(ws, {
-        type:
-          "friend-result",
-        ok: true,
-        message:
-          `You are now friends with ${from}.`
-      });
-
-      sendProfile(
+      updateProfileAndSend(
         ws.username
       );
 
-      sendProfile(from);
+      updateProfileAndSend(
+        from
+      );
 
       sendFriends(
         ws.username
       );
 
       sendFriends(from);
+
+      return;
+    }
+
+    if (
+      message.type ===
+      "friend-decline"
+    ) {
+      const from =
+        cleanName(
+          message.username ||
+          message.from
+        );
+
+      ensureSet(
+        friendRequests,
+        ws.username
+      ).delete(from);
+
+      sendFriends(
+        ws.username
+      );
+
+      return;
+    }
+
+    if (
+      message.type ===
+      "friend-remove"
+    ) {
+      const target =
+        cleanName(
+          message.username ||
+          message.to
+        );
+
+      ensureSet(
+        friends,
+        ws.username
+      ).delete(target);
+
+      ensureSet(
+        friends,
+        target
+      ).delete(ws.username);
+
+      sendFriends(
+        ws.username
+      );
+
+      sendFriends(target);
+
+      updateProfileAndSend(
+        ws.username
+      );
+
+      updateProfileAndSend(
+        target
+      );
 
       return;
     }
@@ -1169,7 +1699,8 @@ wss.on("connection", ws => {
 
       if (
         !to ||
-        to === ws.username
+        to ===
+          ws.username
       ) {
         return;
       }
@@ -1180,13 +1711,16 @@ wss.on("connection", ws => {
           to
         )
       ) {
-        send(ws, {
-          type:
-            "invite-result",
-          ok: false,
-          error:
-            "You can only invite friends."
-        });
+        send(
+          ws,
+          {
+            type:
+              "invite-result",
+            ok: false,
+            error:
+              "You can only invite friends."
+          }
+        );
 
         return;
       }
@@ -1194,17 +1728,21 @@ wss.on("connection", ws => {
       const target =
         [...clients].find(
           c =>
-            c.username === to
+            c.username ===
+            to
         );
 
       if (!target) {
-        send(ws, {
-          type:
-            "invite-result",
-          ok: false,
-          error:
-            "That friend is offline."
-        });
+        send(
+          ws,
+          {
+            type:
+              "invite-result",
+            ok: false,
+            error:
+              "That friend is offline."
+          }
+        );
 
         return;
       }
@@ -1213,13 +1751,16 @@ wss.on("connection", ws => {
         ws.roomId ||
         ws.queueMode
       ) {
-        send(ws, {
-          type:
-            "invite-result",
-          ok: false,
-          error:
-            "Leave your current match before sending an invite."
-        });
+        send(
+          ws,
+          {
+            type:
+              "invite-result",
+            ok: false,
+            error:
+              "Leave your current match before sending an invite."
+          }
+        );
 
         return;
       }
@@ -1228,13 +1769,16 @@ wss.on("connection", ws => {
         target.roomId ||
         target.queueMode
       ) {
-        send(ws, {
-          type:
-            "invite-result",
-          ok: false,
-          error:
-            "That friend is already busy."
-        });
+        send(
+          ws,
+          {
+            type:
+              "invite-result",
+            ok: false,
+            error:
+              "That friend is already busy."
+          }
+        );
 
         return;
       }
@@ -1254,22 +1798,28 @@ wss.on("connection", ws => {
         }
       );
 
-      send(target, {
-        type:
-          "game-invite",
-        inviteId,
-        from:
-          ws.username,
-        mode
-      });
+      send(
+        target,
+        {
+          type:
+            "game-invite",
+          inviteId,
+          from:
+            ws.username,
+          mode
+        }
+      );
 
-      send(ws, {
-        type:
-          "invite-result",
-        ok: true,
-        message:
-          `Invite sent to ${to}.`
-      });
+      send(
+        ws,
+        {
+          type:
+            "invite-result",
+          ok: true,
+          message:
+            `Invite sent to ${to}.`
+        }
+      );
 
       return;
     }
@@ -1280,14 +1830,11 @@ wss.on("connection", ws => {
     ) {
       const id =
         String(
-          message.inviteId ||
-          ""
+          message.inviteId || ""
         );
 
       const invite =
-        pendingInvites.get(
-          id
-        );
+        pendingInvites.get(id);
 
       if (
         !invite ||
@@ -1297,9 +1844,7 @@ wss.on("connection", ws => {
         return;
       }
 
-      pendingInvites.delete(
-        id
-      );
+      pendingInvites.delete(id);
 
       const sender =
         [...clients].find(
@@ -1309,12 +1854,15 @@ wss.on("connection", ws => {
         );
 
       if (sender) {
-        send(sender, {
-          type:
-            "invite-declined",
-          from:
-            ws.username
-        });
+        send(
+          sender,
+          {
+            type:
+              "invite-declined",
+            from:
+              ws.username
+          }
+        );
       }
 
       return;
@@ -1326,27 +1874,27 @@ wss.on("connection", ws => {
     ) {
       const id =
         String(
-          message.inviteId ||
-          ""
+          message.inviteId || ""
         );
 
       const invite =
-        pendingInvites.get(
-          id
-        );
+        pendingInvites.get(id);
 
       if (
         !invite ||
         invite.to !==
           ws.username
       ) {
-        send(ws, {
-          type:
-            "invite-result",
-          ok: false,
-          error:
-            "That invite is no longer available."
-        });
+        send(
+          ws,
+          {
+            type:
+              "invite-result",
+            ok: false,
+            error:
+              "That invite is no longer available."
+          }
+        );
 
         return;
       }
@@ -1355,13 +1903,16 @@ wss.on("connection", ws => {
         ws.roomId ||
         ws.queueMode
       ) {
-        send(ws, {
-          type:
-            "invite-result",
-          ok: false,
-          error:
-            "You are already in a game."
-        });
+        send(
+          ws,
+          {
+            type:
+              "invite-result",
+            ok: false,
+            error:
+              "You are already in a game."
+          }
+        );
 
         return;
       }
@@ -1382,20 +1933,21 @@ wss.on("connection", ws => {
           id
         );
 
-        send(ws, {
-          type:
-            "invite-result",
-          ok: false,
-          error:
-            "Your friend is no longer available."
-        });
+        send(
+          ws,
+          {
+            type:
+              "invite-result",
+            ok: false,
+            error:
+              "Your friend is no longer available."
+          }
+        );
 
         return;
       }
 
-      pendingInvites.delete(
-        id
-      );
+      pendingInvites.delete(id);
 
       startMatch(
         sender,
@@ -1419,14 +1971,10 @@ wss.on("connection", ws => {
 
       const text =
         String(
-          message.text ||
-          ""
+          message.text || ""
         )
           .trim()
-          .slice(
-            0,
-            300
-          );
+          .slice(0, 300);
 
       if (
         !text ||
@@ -1445,29 +1993,34 @@ wss.on("connection", ws => {
       );
 
       for (const c of clients) {
-        if (
-          c.username ===
-          to
-        ) {
-          send(c, {
-            type: "dm",
-            from:
-              ws.username,
-            text,
-            createdAt:
-              new Date().toISOString()
-          });
+        if (c.username === to) {
+          send(
+            c,
+            {
+              type:
+                "dm",
+              from:
+                ws.username,
+              text,
+              createdAt:
+                new Date().toISOString()
+            }
+          );
         }
       }
 
-      send(ws, {
-        type: "dm",
-        from:
-          ws.username,
-        text,
-        createdAt:
-          new Date().toISOString()
-      });
+      send(
+        ws,
+        {
+          type:
+            "dm",
+          from:
+            ws.username,
+          text,
+          createdAt:
+            new Date().toISOString()
+        }
+      );
 
       sendDmHistory(
         ws.username,
@@ -1502,40 +2055,6 @@ wss.on("connection", ws => {
           to
         );
       }
-
-      return;
-    }
-
-    if (
-      message.type ===
-      "get-leaderboards"
-    ) {
-      for (
-        const mode of [
-          "face",
-          "hunt",
-          "chat"
-        ]
-      ) {
-        send(
-          ws,
-          leaderboardPayload(
-            mode
-          )
-        );
-      }
-
-      send(
-        ws,
-        xpLeaderboardPayload()
-      );
-
-      send(
-        ws,
-        profilePayload(
-          ws.username
-        )
-      );
 
       return;
     }
@@ -1578,13 +2097,16 @@ wss.on("connection", ws => {
         !mode ||
         !room
       ) {
-        send(ws, {
-          type:
-            "report-result",
-          ok: false,
-          error:
-            "You can only report someone while connected to a game."
-        });
+        send(
+          ws,
+          {
+            type:
+              "report-result",
+            ok: false,
+            error:
+              "You can only report someone while connected to a game."
+          }
+        );
 
         return;
       }
@@ -1607,38 +2129,40 @@ wss.on("connection", ws => {
 
       const details =
         String(
-          message.details ||
-          ""
+          message.details || ""
         )
           .trim()
-          .slice(
-            0,
-            1000
-          );
+          .slice(0, 1000);
 
       const report = {
-        id:
-          createId(),
+        id: createId(),
+
         createdAt:
           new Date().toISOString(),
+
         mode,
+
         reporterId:
           ws.playerId,
+
         reporterUsername:
           ws.username,
+
         reportedId:
           opponent.playerId,
+
         reportedUsername:
           opponent.username,
+
         roomId:
           room.id,
+
         reason,
+
         details
       };
 
-      reports.push(
-        report
-      );
+      reports.push(report);
 
       if (
         reports.length >
@@ -1654,13 +2178,16 @@ wss.on("connection", ws => {
         )
       );
 
-      send(ws, {
-        type:
-          "report-result",
-        ok: true,
-        reportId:
-          report.id
-      });
+      send(
+        ws,
+        {
+          type:
+            "report-result",
+          ok: true,
+          reportId:
+            report.id
+        }
+      );
 
       return;
     }
@@ -1669,15 +2196,16 @@ wss.on("connection", ws => {
       message.type ===
       "find-match"
     ) {
-      const mode = [
-        "face",
-        "chat",
-        "hunt"
-      ].includes(
-        message.mode
-      )
-        ? message.mode
-        : "face";
+      const mode =
+        [
+          "face",
+          "chat",
+          "hunt"
+        ].includes(
+          message.mode
+        )
+          ? message.mode
+          : "face";
 
       if (
         message.username
@@ -1686,11 +2214,13 @@ wss.on("connection", ws => {
           cleanName(
             message.username
           );
+
+        ensureProfile(
+          ws.username
+        );
       }
 
-      removeFromWaiting(
-        ws
-      );
+      removeFromWaiting(ws);
 
       const opponent =
         findWaitingOpponent(
@@ -1711,6 +2241,10 @@ wss.on("connection", ws => {
       }
 
       broadcastOnline();
+
+      sendProfile(
+        ws.username
+      );
 
       return;
     }
@@ -1783,19 +2317,25 @@ wss.on("connection", ws => {
         ws.playerId
       );
 
-      send(room.a, {
-        type:
-          "rematch-status",
-        ready:
-          room.rematchReady.size
-      });
+      send(
+        room.a,
+        {
+          type:
+            "rematch-status",
+          ready:
+            room.rematchReady.size
+        }
+      );
 
-      send(room.b, {
-        type:
-          "rematch-status",
-        ready:
-          room.rematchReady.size
-      });
+      send(
+        room.b,
+        {
+          type:
+            "rematch-status",
+          ready:
+            room.rematchReady.size
+        }
+      );
 
       if (
         room.rematchReady.size ===
@@ -1803,7 +2343,9 @@ wss.on("connection", ws => {
       ) {
         room.rematchReady.clear();
 
-        room.completed = false;
+        room.completed =
+          false;
+
         room.round = 1;
 
         room.scores = {
@@ -1812,6 +2354,7 @@ wss.on("connection", ws => {
         };
 
         room.roundScores = {};
+
         room.bestFaceRound = {};
 
         room.perfectFace = {
@@ -1822,7 +2365,12 @@ wss.on("connection", ws => {
         room.nextReady =
           new Set();
 
-        room.huntFound = false;
+        room.skipReady =
+          new Set();
+
+        room.huntFound =
+          false;
+
         room.usedTargets =
           new Set();
 
@@ -1838,33 +2386,44 @@ wss.on("connection", ws => {
                 )
               : null;
 
-        send(room.a, {
-          type:
-            "rematch-started",
-          round: 1,
-          totalRounds:
-            room.totalRounds,
-          mode:
-            room.mode,
-          target:
-            room.target
-        });
-
-        send(room.b, {
-          type:
-            "rematch-started",
-          round: 1,
-          totalRounds:
-            room.totalRounds,
-          mode:
-            room.mode,
-          target:
-            room.target
-        });
-
-        scheduleHuntTimeout(
-          room
+        send(
+          room.a,
+          {
+            type:
+              "rematch-started",
+            round: 1,
+            totalRounds:
+              room.totalRounds,
+            mode:
+              room.mode,
+            target:
+              room.target
+          }
         );
+
+        send(
+          room.b,
+          {
+            type:
+              "rematch-started",
+            round: 1,
+            totalRounds:
+              room.totalRounds,
+            mode:
+              room.mode,
+            target:
+              room.target
+          }
+        );
+
+        if (
+          room.mode ===
+          "hunt"
+        ) {
+          scheduleHuntTimeout(
+            room
+          );
+        }
       }
 
       return;
@@ -1872,7 +2431,7 @@ wss.on("connection", ws => {
 
     if (
       message.type ===
-      "skip-item" &&
+        "skip-item" &&
       room.mode ===
         "hunt"
     ) {
@@ -1886,19 +2445,25 @@ wss.on("connection", ws => {
         ws.playerId
       );
 
-      send(room.a, {
-        type:
-          "skip-item-status",
-        ready:
-          room.skipReady.size
-      });
+      send(
+        room.a,
+        {
+          type:
+            "skip-item-status",
+          ready:
+            room.skipReady.size
+        }
+      );
 
-      send(room.b, {
-        type:
-          "skip-item-status",
-        ready:
-          room.skipReady.size
-      });
+      send(
+        room.b,
+        {
+          type:
+            "skip-item-status",
+          ready:
+            room.skipReady.size
+        }
+      );
 
       if (
         room.skipReady.size ===
@@ -1906,41 +2471,52 @@ wss.on("connection", ws => {
       ) {
         room.skipReady.clear();
 
-        room.huntFound = false;
-        room.roundScores = {};
+        room.huntFound =
+          false;
+
+        room.roundScores =
+          {};
 
         room.target =
           nextHuntTarget(
             room.usedTargets
           );
 
-        send(room.a, {
-          type:
-            "new-round",
-          round:
-            room.round,
-          totalRounds:
-            room.totalRounds,
-          mode:
-            "hunt",
-          target:
-            room.target,
-          skipped: true
-        });
+        send(
+          room.a,
+          {
+            type:
+              "new-round",
+            round:
+              room.round,
+            totalRounds:
+              room.totalRounds,
+            mode:
+              "hunt",
+            target:
+              room.target,
+            skipped:
+              true
+          }
+        );
 
-        send(room.b, {
-          type:
-            "new-round",
-          round:
-            room.round,
-          totalRounds:
-            room.totalRounds,
-          mode:
-            "hunt",
-          target:
-            room.target,
-          skipped: true
-        });
+        send(
+          room.b,
+          {
+            type:
+              "new-round",
+            round:
+              room.round,
+            totalRounds:
+              room.totalRounds,
+            mode:
+              "hunt",
+            target:
+              room.target,
+            skipped:
+              true
+          }
+        );
 
         scheduleHuntTimeout(
           room
@@ -2005,29 +2581,35 @@ wss.on("connection", ws => {
           ] || 0
         ) + score;
 
-      send(ws, {
-        type:
-          "your-score",
-        score,
-        totalScore:
-          room.scores[
-            ws.playerId
-          ],
-        round:
-          room.round
-      });
+      send(
+        ws,
+        {
+          type:
+            "your-score",
+          score,
+          totalScore:
+            room.scores[
+              ws.playerId
+            ],
+          round:
+            room.round
+        }
+      );
 
-      send(opponent, {
-        type:
-          "opponent-score",
-        score,
-        totalScore:
-          room.scores[
-            ws.playerId
-          ],
-        round:
-          room.round
-      });
+      send(
+        opponent,
+        {
+          type:
+            "opponent-score",
+          score,
+          totalScore:
+            room.scores[
+              ws.playerId
+            ],
+          round:
+            room.round
+        }
+      );
 
       return;
     }
@@ -2048,32 +2630,32 @@ wss.on("connection", ws => {
         return;
       }
 
-      room.huntFound = true;
+      room.huntFound =
+        true;
 
-      if (
-        room.huntTimer
-      ) {
-        clearTimeout(
-          room.huntTimer
-        );
+      clearHuntTimer(
+        room
+      );
 
-        room.huntTimer =
-          null;
-      }
+      send(
+        room.a,
+        {
+          type:
+            "hunt-timeout",
+          round:
+            room.round
+        }
+      );
 
-      send(room.a, {
-        type:
-          "hunt-timeout",
-        round:
-          room.round
-      });
-
-      send(room.b, {
-        type:
-          "hunt-timeout",
-        round:
-          room.round
-      });
+      send(
+        room.b,
+        {
+          type:
+            "hunt-timeout",
+          round:
+            room.round
+        }
+      );
 
       sendNextRound(
         room
@@ -2098,44 +2680,44 @@ wss.on("connection", ws => {
         return;
       }
 
-      room.huntFound = true;
+      room.huntFound =
+        true;
 
-      if (
-        room.huntTimer
-      ) {
-        clearTimeout(
-          room.huntTimer
-        );
-
-        room.huntTimer =
-          null;
-      }
+      clearHuntTimer(
+        room
+      );
 
       room.scores[
         ws.playerId
       ] += 1;
 
-      send(room.a, {
-        type:
-          "hunt-winner",
-        winnerId:
-          ws.playerId,
-        round:
-          room.round,
-        scores:
-          room.scores
-      });
+      send(
+        room.a,
+        {
+          type:
+            "hunt-winner",
+          winnerId:
+            ws.playerId,
+          round:
+            room.round,
+          scores:
+            room.scores
+        }
+      );
 
-      send(room.b, {
-        type:
-          "hunt-winner",
-        winnerId:
-          ws.playerId,
-        round:
-          room.round,
-        scores:
-          room.scores
-      });
+      send(
+        room.b,
+        {
+          type:
+            "hunt-winner",
+          winnerId:
+            ws.playerId,
+          round:
+            room.round,
+          scores:
+            room.scores
+        }
+      );
 
       setTimeout(() => {
         if (
@@ -2182,26 +2764,28 @@ wss.on("connection", ws => {
     ) {
       const text =
         String(
-          message.text ||
-          ""
-        ).slice(
-          0,
-          300
-        );
+          message.text || ""
+        ).slice(0, 300);
 
       if (text) {
-        send(opponent, {
-          type:
-            "chat-message",
-          text
-        });
+        send(
+          opponent,
+          {
+            type:
+              "chat-message",
+            text
+          }
+        );
 
-        send(ws, {
-          type:
-            "chat-message",
-          text,
-          self: true
-        });
+        send(
+          ws,
+          {
+            type:
+              "chat-message",
+            text,
+            self: true
+          }
+        );
       }
 
       return;
@@ -2212,14 +2796,19 @@ wss.on("connection", ws => {
         "signal" &&
       opponent
     ) {
-      send(opponent, {
-        type:
-          "signal",
-        signal:
-          message.signal,
-        from:
-          ws.playerId
-      });
+      send(
+        opponent,
+        {
+          type:
+            "signal",
+          signal:
+            message.signal,
+          from:
+            ws.playerId
+        }
+      );
+
+      return;
     }
   });
 
@@ -2259,22 +2848,44 @@ wss.on("connection", ws => {
         ws.username
       )
     ) {
-      sendFriends(
-        name
-      );
+      sendFriends(name);
     }
   });
 });
 
+const heartbeat =
+  setInterval(() => {
+    for (const ws of wss.clients) {
+      if (
+        ws.isAlive === false
+      ) {
+        ws.terminate();
+        continue;
+      }
+
+      ws.isAlive = false;
+
+      try {
+        ws.ping();
+      } catch {}
+    }
+  }, 10000);
+
+wss.on("close", () => {
+  clearInterval(
+    heartbeat
+  );
+});
+
 const PORT =
-  process.env.PORT ||
-  3000;
+  process.env.PORT || 3000;
 
 server.listen(
   PORT,
   "0.0.0.0",
-  () =>
+  () => {
     console.log(
       `EmojiTV running on port ${PORT}`
-    )
+    );
+  }
 );
