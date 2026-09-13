@@ -187,10 +187,10 @@ function cleanName(name) {
 }
 
 function removeFromWaiting(ws) {
-  const i = waiting.indexOf(ws);
+  const index = waiting.indexOf(ws);
 
-  if (i !== -1) {
-    waiting.splice(i, 1);
+  if (index !== -1) {
+    waiting.splice(index, 1);
   }
 }
 
@@ -206,9 +206,10 @@ function modeRounds(mode) {
 
 function nextUnique(list, used) {
   const available = list.filter(item => {
-    const key = typeof item === "string"
-      ? item
-      : item.emoji;
+    const key =
+      typeof item === "string"
+        ? item
+        : item.emoji;
 
     return !used.has(key);
   });
@@ -233,7 +234,9 @@ function nextHuntTarget(used) {
 }
 
 function pairKey(a, b) {
-  return [a, b].sort().join("\u0000");
+  return [a, b]
+    .sort()
+    .join("\u0000");
 }
 
 function ensureSet(map, key) {
@@ -249,8 +252,13 @@ function isFriend(a, b) {
 }
 
 function friendPayload(username) {
-  const list = [...ensureSet(friends, username)];
-  const pending = [...ensureSet(friendRequests, username)];
+  const list = [
+    ...ensureSet(friends, username)
+  ];
+
+  const pending = [
+    ...ensureSet(friendRequests, username)
+  ];
 
   return {
     type: "friends",
@@ -258,7 +266,7 @@ function friendPayload(username) {
     friends: list.map(name => ({
       username: name,
       online: [...clients].some(
-        c => c.username === name
+        client => client.username === name
       )
     })),
 
@@ -267,9 +275,12 @@ function friendPayload(username) {
 }
 
 function sendFriends(username) {
-  for (const c of clients) {
-    if (c.username === username) {
-      send(c, friendPayload(username));
+  for (const client of clients) {
+    if (client.username === username) {
+      send(
+        client,
+        friendPayload(username)
+      );
     }
   }
 }
@@ -278,9 +289,9 @@ function sendDmHistory(a, b) {
   const history =
     dmHistory.get(pairKey(a, b)) || [];
 
-  for (const c of clients) {
-    if (c.username === a) {
-      send(c, {
+  for (const client of clients) {
+    if (client.username === a) {
+      send(client, {
         type: "dm-history",
         with: b,
         messages: history.slice(-100)
@@ -310,7 +321,9 @@ function addDm(a, b, text) {
 function onlinePayload() {
   const names = [...clients]
     .map(ws => ws.username || "Guest")
-    .sort((a, b) => a.localeCompare(b));
+    .sort((a, b) =>
+      a.localeCompare(b)
+    );
 
   return {
     type: "online-list",
@@ -322,8 +335,8 @@ function onlinePayload() {
 function broadcastOnline() {
   broadcast(onlinePayload());
 
-  for (const c of clients) {
-    sendFriends(c.username);
+  for (const client of clients) {
+    sendFriends(client.username);
   }
 }
 
@@ -361,11 +374,10 @@ function recordCompletedGame(room) {
     scores[room.b.playerId] || 0;
 
   for (const player of players) {
-    const stats =
-      ensureStats(
-        room.mode,
-        player.username
-      );
+    const stats = ensureStats(
+      room.mode,
+      player.username
+    );
 
     stats.games += 1;
 
@@ -394,11 +406,10 @@ function leaderboardPayload(mode) {
   const rows = [
     ...leaderboard[mode].values()
   ]
-    .sort(
-      (a, b) =>
-        b.wins - a.wins ||
-        b.points - a.points ||
-        a.username.localeCompare(b.username)
+    .sort((a, b) =>
+      b.wins - a.wins ||
+      b.points - a.points ||
+      a.username.localeCompare(b.username)
     )
     .slice(0, 20)
     .map((x, i) => ({
@@ -424,10 +435,7 @@ function broadcastLeaderboards() {
   }
 }
 
-function endRoom(
-  ws,
-  notifyOpponent = true
-) {
+function endRoom(ws, notifyOpponent = true) {
   removeFromWaiting(ws);
 
   if (!ws.roomId) {
@@ -442,15 +450,15 @@ function endRoom(
     return null;
   }
 
-  if (room.huntTimer) {
-    clearTimeout(room.huntTimer);
-    room.huntTimer = null;
-  }
-
   const opponent =
     room.a === ws
       ? room.b
       : room.a;
+
+  if (room.huntTimer) {
+    clearTimeout(room.huntTimer);
+    room.huntTimer = null;
+  }
 
   if (
     room.mode === "chat" &&
@@ -481,7 +489,10 @@ function endRoom(
     broadcastLeaderboards();
   }
 
-  if (opponent && notifyOpponent) {
+  if (
+    opponent &&
+    notifyOpponent
+  ) {
     send(opponent, {
       type: "opponent-left"
     });
@@ -526,7 +537,6 @@ function findWaitingOpponent(mode) {
       candidate.queueMode === mode
     ) {
       waiting.splice(i, 1);
-
       candidate.queueMode = null;
 
       return candidate;
@@ -590,16 +600,6 @@ function startMatch(
 
   const rounds = modeRounds(mode);
 
-  const usedTargets = new Set();
-
-  if (target) {
-    usedTargets.add(
-      typeof target === "string"
-        ? target
-        : target.emoji
-    );
-  }
-
   const room = {
     id: roomId,
 
@@ -613,7 +613,11 @@ function startMatch(
 
     target,
 
-    usedTargets,
+    usedTargets: new Set(
+      target
+        ? [target.emoji || target]
+        : []
+    ),
 
     scores: {
       [playerA.playerId]: 0,
@@ -623,9 +627,7 @@ function startMatch(
     roundScores: {},
 
     nextReady: new Set(),
-
     rematchReady: new Set(),
-
     skipReady: new Set(),
 
     huntFound: false,
@@ -633,7 +635,6 @@ function startMatch(
     completed: false,
 
     huntTimer: null,
-
     huntStartedAt: null
   };
 
@@ -703,7 +704,9 @@ function sendNextRound(room) {
 
   room.target =
     room.mode === "hunt"
-      ? nextHuntTarget(room.usedTargets)
+      ? nextHuntTarget(
+          room.usedTargets
+        )
       : room.mode === "face"
         ? nextUnique(
             EMOJIS,
@@ -729,11 +732,9 @@ wss.on("connection", ws => {
   clients.add(ws);
 
   ws.playerId = createId();
-
   ws.roomId = null;
   ws.role = null;
   ws.queueMode = null;
-
   ws.username = "Guest";
 
   send(ws, {
@@ -757,16 +758,12 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (
-      message.type ===
-      "set-username"
-    ) {
+    if (message.type === "set-username") {
       const oldName = ws.username;
 
-      ws.username =
-        cleanName(
-          message.username
-        );
+      ws.username = cleanName(
+        message.username
+      );
 
       send(ws, {
         type: "username-saved",
@@ -785,10 +782,7 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (
-      message.type ===
-      "get-friends"
-    ) {
+    if (message.type === "get-friends") {
       send(
         ws,
         friendPayload(ws.username)
@@ -797,12 +791,10 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (
-      message.type ===
-      "friend-request"
-    ) {
-      const to =
-        cleanName(message.to);
+    if (message.type === "friend-request") {
+      const to = cleanName(
+        message.to
+      );
 
       if (
         !to ||
@@ -811,10 +803,12 @@ wss.on("connection", ws => {
         return;
       }
 
-      const target =
-        [...clients].find(
-          c => c.username === to
-        );
+      const target = [
+        ...clients
+      ].find(
+        client =>
+          client.username === to
+      );
 
       if (!target) {
         send(ws, {
@@ -867,12 +861,10 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (
-      message.type ===
-      "friend-accept"
-    ) {
-      const from =
-        cleanName(message.from);
+    if (message.type === "friend-accept") {
+      const from = cleanName(
+        message.from
+      );
 
       ensureSet(
         friendRequests,
@@ -902,18 +894,18 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (
-      message.type ===
-      "friend-invite"
-    ) {
-      const to =
-        cleanName(message.to);
+    if (message.type === "friend-invite") {
+      const to = cleanName(
+        message.to
+      );
 
-      const mode =
-        ["face", "chat", "hunt"]
-          .includes(message.mode)
-          ? message.mode
-          : "face";
+      const mode = [
+        "face",
+        "chat",
+        "hunt"
+      ].includes(message.mode)
+        ? message.mode
+        : "face";
 
       if (
         !to ||
@@ -938,10 +930,12 @@ wss.on("connection", ws => {
         return;
       }
 
-      const target =
-        [...clients].find(
-          c => c.username === to
-        );
+      const target = [
+        ...clients
+      ].find(
+        client =>
+          client.username === to
+      );
 
       if (!target) {
         send(ws, {
@@ -982,8 +976,7 @@ wss.on("connection", ws => {
         return;
       }
 
-      const inviteId =
-        createId();
+      const inviteId = createId();
 
       pendingInvites.set(
         inviteId,
@@ -1016,10 +1009,9 @@ wss.on("connection", ws => {
       message.type ===
       "decline-invite"
     ) {
-      const id =
-        String(
-          message.inviteId || ""
-        );
+      const id = String(
+        message.inviteId || ""
+      );
 
       const invite =
         pendingInvites.get(id);
@@ -1033,12 +1025,13 @@ wss.on("connection", ws => {
 
       pendingInvites.delete(id);
 
-      const sender =
-        [...clients].find(
-          c =>
-            c.username ===
-            invite.from
-        );
+      const sender = [
+        ...clients
+      ].find(
+        client =>
+          client.username ===
+          invite.from
+      );
 
       if (sender) {
         send(sender, {
@@ -1054,10 +1047,9 @@ wss.on("connection", ws => {
       message.type ===
       "accept-invite"
     ) {
-      const id =
-        String(
-          message.inviteId || ""
-        );
+      const id = String(
+        message.inviteId || ""
+      );
 
       const invite =
         pendingInvites.get(id);
@@ -1090,12 +1082,13 @@ wss.on("connection", ws => {
         return;
       }
 
-      const sender =
-        [...clients].find(
-          c =>
-            c.username ===
-            invite.from
-        );
+      const sender = [
+        ...clients
+      ].find(
+        client =>
+          client.username ===
+          invite.from
+      );
 
       if (
         !sender ||
@@ -1127,18 +1120,16 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (
-      message.type === "dm"
-    ) {
-      const to =
-        cleanName(message.to);
+    if (message.type === "dm") {
+      const to = cleanName(
+        message.to
+      );
 
-      const text =
-        String(
-          message.text || ""
-        )
-          .trim()
-          .slice(0, 300);
+      const text = String(
+        message.text || ""
+      )
+        .trim()
+        .slice(0, 300);
 
       if (
         !text ||
@@ -1156,14 +1147,18 @@ wss.on("connection", ws => {
         text
       );
 
-      for (const c of clients) {
-        if (c.username === to) {
-          send(c, {
+      const createdAt =
+        new Date().toISOString();
+
+      for (const client of clients) {
+        if (
+          client.username === to
+        ) {
+          send(client, {
             type: "dm",
             from: ws.username,
             text,
-            createdAt:
-              new Date().toISOString()
+            createdAt
           });
         }
       }
@@ -1172,8 +1167,7 @@ wss.on("connection", ws => {
         type: "dm",
         from: ws.username,
         text,
-        createdAt:
-          new Date().toISOString()
+        createdAt
       });
 
       sendDmHistory(
@@ -1193,8 +1187,9 @@ wss.on("connection", ws => {
       message.type ===
       "get-dm-history"
     ) {
-      const to =
-        cleanName(message.to);
+      const to = cleanName(
+        message.to
+      );
 
       if (
         isFriend(
@@ -1229,10 +1224,7 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (
-      message.type ===
-      "report"
-    ) {
+    if (message.type === "report") {
       const allowedModes = [
         "face",
         "chat",
@@ -1249,10 +1241,9 @@ wss.on("connection", ws => {
         "other"
       ];
 
-      const room =
-        ws.roomId
-          ? rooms.get(ws.roomId)
-          : null;
+      const room = ws.roomId
+        ? rooms.get(ws.roomId)
+        : null;
 
       const mode =
         allowedModes.includes(
@@ -1288,12 +1279,11 @@ wss.on("connection", ws => {
           ? message.reason
           : "other";
 
-      const details =
-        String(
-          message.details || ""
-        )
-          .trim()
-          .slice(0, 1000);
+      const details = String(
+        message.details || ""
+      )
+        .trim()
+        .slice(0, 1000);
 
       const report = {
         id: createId(),
@@ -1345,21 +1335,19 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (
-      message.type ===
-      "find-match"
-    ) {
-      const mode =
-        ["face", "chat", "hunt"]
-          .includes(message.mode)
-          ? message.mode
-          : "face";
+    if (message.type === "find-match") {
+      const mode = [
+        "face",
+        "chat",
+        "hunt"
+      ].includes(message.mode)
+        ? message.mode
+        : "face";
 
       if (message.username) {
-        ws.username =
-          cleanName(
-            message.username
-          );
+        ws.username = cleanName(
+          message.username
+        );
       }
 
       removeFromWaiting(ws);
@@ -1385,19 +1373,12 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (
-      message.type ===
-      "skip"
-    ) {
-      const oldMode =
-        ws.roomId
-          ? rooms.get(ws.roomId)?.mode
-          : ws.queueMode;
+    if (message.type === "skip") {
+      const oldMode = ws.roomId
+        ? rooms.get(ws.roomId)?.mode
+        : ws.queueMode;
 
-      endRoom(
-        ws,
-        true
-      );
+      endRoom(ws, true);
 
       if (oldMode) {
         putInQueue(
@@ -1411,14 +1392,8 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (
-      message.type ===
-      "leave"
-    ) {
-      endRoom(
-        ws,
-        true
-      );
+    if (message.type === "leave") {
+      endRoom(ws, true);
 
       broadcastOnline();
 
@@ -1482,6 +1457,9 @@ wss.on("connection", ws => {
 
         room.huntFound = false;
 
+        room.skipReady =
+          new Set();
+
         room.usedTargets =
           new Set();
 
@@ -1498,7 +1476,8 @@ wss.on("connection", ws => {
               : null;
 
         send(room.a, {
-          type: "rematch-started",
+          type:
+            "rematch-started",
           round: 1,
           totalRounds:
             room.totalRounds,
@@ -1507,7 +1486,8 @@ wss.on("connection", ws => {
         });
 
         send(room.b, {
-          type: "rematch-started",
+          type:
+            "rematch-started",
           round: 1,
           totalRounds:
             room.totalRounds,
@@ -1521,13 +1501,6 @@ wss.on("connection", ws => {
       return;
     }
 
-    /*
-      EMOJI HUNT — SKIP ITEM
-
-      Both players must press
-      SKIP ITEM before the
-      target changes.
-    */
     if (
       message.type ===
       "skip-item" &&
@@ -1595,24 +1568,18 @@ wss.on("connection", ws => {
       return;
     }
 
-    /*
-      EMOJI FACE-OFF SCORE
-    */
     if (
       message.type ===
       "round-score" &&
       room.mode === "face"
     ) {
-      const score =
-        Math.max(
-          0,
-          Math.min(
-            100,
-            Number(
-              message.score
-            ) || 0
-          )
-        );
+      const score = Math.max(
+        0,
+        Math.min(
+          100,
+          Number(message.score) || 0
+        )
+      );
 
       room.roundScores[
         ws.playerId
@@ -1632,8 +1599,7 @@ wss.on("connection", ws => {
           room.scores[
             ws.playerId
           ],
-        round:
-          room.round
+        round: room.round
       });
 
       send(opponent, {
@@ -1643,17 +1609,12 @@ wss.on("connection", ws => {
           room.scores[
             ws.playerId
           ],
-        round:
-          room.round
+        round: room.round
       });
 
       return;
     }
 
-    /*
-      EMOJI HUNT — AUTHORITATIVE
-      60 SECOND TIMEOUT
-    */
     if (
       message.type ===
       "hunt-timeout" &&
@@ -1681,14 +1642,12 @@ wss.on("connection", ws => {
 
       send(room.a, {
         type: "hunt-timeout",
-        round:
-          room.round
+        round: room.round
       });
 
       send(room.b, {
         type: "hunt-timeout",
-        round:
-          room.round
+        round: room.round
       });
 
       sendNextRound(room);
@@ -1696,9 +1655,6 @@ wss.on("connection", ws => {
       return;
     }
 
-    /*
-      EMOJI HUNT — FOUND ITEM
-    */
     if (
       message.type ===
       "hunt-found" &&
@@ -1750,8 +1706,7 @@ wss.on("connection", ws => {
 
       setTimeout(() => {
         if (
-          rooms.get(room.id) ===
-          room
+          rooms.get(room.id) === room
         ) {
           sendNextRound(room);
         }
@@ -1760,9 +1715,6 @@ wss.on("connection", ws => {
       return;
     }
 
-    /*
-      FACE-OFF — NEXT ROUND
-    */
     if (
       message.type ===
       "next-round" &&
@@ -1781,29 +1733,23 @@ wss.on("connection", ws => {
       return;
     }
 
-    /*
-      VIDEO CHAT
-    */
     if (
       message.type ===
       "chat-message" &&
       room.mode === "chat"
     ) {
-      const text =
-        String(
-          message.text || ""
-        ).slice(0, 300);
+      const text = String(
+        message.text || ""
+      ).slice(0, 300);
 
       if (text) {
         send(opponent, {
-          type:
-            "chat-message",
+          type: "chat-message",
           text
         });
 
         send(ws, {
-          type:
-            "chat-message",
+          type: "chat-message",
           text,
           self: true
         });
@@ -1812,12 +1758,8 @@ wss.on("connection", ws => {
       return;
     }
 
-    /*
-      WEBRTC SIGNALING
-    */
     if (
-      message.type ===
-      "signal" &&
+      message.type === "signal" &&
       opponent
     ) {
       send(opponent, {
@@ -1835,10 +1777,7 @@ wss.on("connection", ws => {
 
     removeFromWaiting(ws);
 
-    endRoom(
-      ws,
-      true
-    );
+    endRoom(ws, true);
 
     for (
       const [
@@ -1859,8 +1798,7 @@ wss.on("connection", ws => {
     broadcastOnline();
 
     for (
-      const name of
-      ensureSet(
+      const name of ensureSet(
         friends,
         ws.username
       )
