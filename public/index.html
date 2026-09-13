@@ -414,13 +414,73 @@ function startHuntRound(round,target){roundToken++;rematchSent=false;stopHuntTim
 
 function startLaughRound(round){laughRound=round;$("laughRoundText").textContent=`Round ${round} of 3`;$("laughCountdown").textContent="MAKE THEM LAUGH!";$("laughResult").textContent="Try to make your opponent laugh!";}
 function sendLaugh(){if(ws?.readyState===1)ws.send(JSON.stringify({type:"laugh"}));$("laughResult").textContent="😂 You said they laughed!";}
+let pendingIceCandidates=[];
+let peerStarting=false;
 async function setupPeer(myRole){
-  pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});stream.getTracks().forEach(t=>pc.addTrack(t,stream));
-  pc.ontrack=e=>{["remoteFace","remoteChat","remoteHunt","remoteWaiting"].forEach(id=>{if($(id))$(id).srcObject=e.streams[0]});};
-  pc.onicecandidate=e=>{if(e.candidate&&ws?.readyState===1)ws.send(JSON.stringify({type:"signal",signal:{candidate:e.candidate}}));};
-  if(myRole==="a"){const offer=await pc.createOffer();await pc.setLocalDescription(offer);ws.send(JSON.stringify({type:"signal",signal:{description:pc.localDescription}}));}
+  if(pc){try{pc.close()}catch{}}
+  pendingIceCandidates=[];
+  peerStarting=true;
+  pc=new RTCPeerConnection({iceServers:[
+    {urls:"stun:stun.l.google.com:19302"},
+    {urls:"stun:stun1.l.google.com:19302"}
+  ]});
+  if(stream)stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+  pc.ontrack=e=>{
+    const remoteStream=e.streams?.[0];
+    if(!remoteStream)return;
+    ["remoteFace","remoteChat","remoteHunt","remoteWaiting","remotePose","remoteLaugh"].forEach(id=>{
+      const el=$(id);
+      if(el){el.srcObject=remoteStream;el.muted=false;el.autoplay=true;el.playsInline=true;el.play?.().catch(()=>{});}
+    });
+  };
+  pc.onicecandidate=e=>{
+    if(e.candidate&&ws?.readyState===1){
+      ws.send(JSON.stringify({type:"signal",signal:{candidate:e.candidate}}));
+    }
+  };
+  pc.onconnectionstatechange=()=>{
+    if(!pc)return;
+    if(["failed","disconnected"].includes(pc.connectionState)){
+      console.warn("WebRTC connection state:",pc.connectionState);
+    }
+  };
+  if(myRole==="a"){
+    const offer=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:true});
+    await pc.setLocalDescription(offer);
+    if(ws?.readyState===1){
+      ws.send(JSON.stringify({type:"signal",signal:{description:pc.localDescription}}));
+    }
+  }
+  peerStarting=false;
 }
-async function handleSignal(m){if(!pc)return;try{const s=m.signal;if(s.description){await pc.setRemoteDescription(s.description);if(s.description.type==="offer"){const answer=await pc.createAnswer();await pc.setLocalDescription(answer);ws.send(JSON.stringify({type:"signal",signal:{description:pc.localDescription}}));}}else if(s.candidate)await pc.addIceCandidate(s.candidate);}catch(e){console.warn(e);}}
+async function handleSignal(m){
+  try{
+    if(!pc)return;
+    const s=m.signal||{};
+    if(s.description){
+      await pc.setRemoteDescription(s.description);
+      if(s.description.type==="offer"){
+        const answer=await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        if(ws?.readyState===1){
+          ws.send(JSON.stringify({type:"signal",signal:{description:pc.localDescription}}));
+        }
+      }
+      if(pendingIceCandidates.length){
+        const queued=pendingIceCandidates.splice(0);
+        for(const candidate of queued){
+          try{await pc.addIceCandidate(candidate);}catch(e){console.warn("Queued ICE candidate failed",e);}
+        }
+      }
+    }else if(s.candidate){
+      if(pc.remoteDescription){
+        await pc.addIceCandidate(s.candidate);
+      }else{
+        pendingIceCandidates.push(s.candidate);
+      }
+    }
+  }catch(e){console.warn("WebRTC signaling error",e);}
+}
 
 function sendFriendRequestTo(name,resultEl){const to=String(name||"").trim();if(!to||to===username){if(resultEl)resultEl.textContent="Enter another player's username.";return;}if(ws?.readyState!==1){if(resultEl)resultEl.textContent="Connecting…";return;}ws.send(JSON.stringify({type:"friend-request",to}));if(resultEl)resultEl.textContent=`Friend request sent to ${to}.`;}
 function addCurrentOpponentAsFriend(){sendFriendRequestTo(opponentUsername,$("friendNotice"));}
