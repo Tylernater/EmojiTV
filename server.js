@@ -1,1826 +1,572 @@
 import express from "express";
 import http from "http";
 import { WebSocketServer } from "ws";
-import path from "path";
-import { fileURLToPath } from "url";
 import crypto from "crypto";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
 
 const PORT = process.env.PORT || 3000;
 
-const waiting = [];
-const rooms = new Map();
+app.use(express.static("public"));
+
+app.get("/health", (req, res) => {
+  res.json({
+    ok: true,
+    service: "EmojiTV",
+    players: clients.size,
+    rooms: rooms.size
+  });
+});
+
+const wss = new WebSocketServer({ server });
+
 const clients = new Set();
-
-const leaderboard = {
-  face: new Map(),
-  hunt: new Map(),
-  chat: new Map(),
-  pose: new Map(),
-  laugh: new Map()
-};
-
-const reports = [];
-const MAX_REPORTS = 5000;
-
-const friends = new Map();
-const friendRequests = new Map();
-const dmHistory = new Map();
-const pendingInvites = new Map();
-
+const rooms = new Map();
 const sessions = new Map();
 
-const profiles = new Map();
+const waiting = {
+  face: [],
+  chat: [],
+  hunt: [],
+  pose: [],
+  laugh: []
+};
 
-const XP_PER_LEVEL = 500;
+const users = new Map();
 
-const DAILY_CHALLENGES = [
-  {
-    id: "play-3",
-    event: "game",
-    title: "Play 3 games",
-    target: 3,
-    reward: 100
-  },
-  {
-    id: "win-1",
-    event: "win",
-    title: "Win 1 game",
-    target: 1,
-    reward: 150
-  },
-  {
-    id: "score-80",
-    event: "score80",
-    title: "Score 80+ in a Face-Off round",
-    target: 1,
-    reward: 200
-  },
-  {
-    id: "hunt-3",
-    event: "hunt",
-    title: "Find 3 Hunt items",
-    target: 3,
-    reward: 150
-  },
-  {
-    id: "streak-3",
-    event: "streak",
-    title: "Reach a 3-win streak",
-    target: 3,
-    reward: 250
-  },
-  {
-    id: "friends-5",
-    event: "friend",
-    title: "Make 5 friends",
-    target: 5,
-    reward: 200
-  }
+const dailyChallenges = [
+  "Play 1 game",
+  "Win a Face-Off",
+  "Complete a Hunt"
 ];
 
-const EMOJIS = [
-  "😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇",
-  "🙂","🙃","😉","😌","😍","🥰","😘","😗","😙","😚",
-  "😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🤩",
-  "🥳","🤗","🫠","🫡","🤔","🫢","🫣","🫤","🫥","😐",
-  "😑","😶","🫨","😏","😒","🙄","😬","🤥","😶‍🌫️","😴",
-  "🤤","😪","😵","😵‍💫","🤐","🤢","🤮","🤧","😷","🤒",
-  "🤕","🥴","🥶","🥵","😳","😯","😦","😧","😟","😕",
-  "🙁","☹️","😞","😔","😢","😭","😥","😓","😰","😨",
-  "😱","😖","😣","😩","🥺","🥹","😤","😠","😡","🤬",
-  "🤯","😮","😲","😵‍💫","😱","🤔","🤫","🤭","🫢","🫣"
+const badges = [
+  "First Win",
+  "5 Win Streak",
+  "10 Win Streak",
+  "Perfect Face-Off",
+  "Hunt Master",
+  "10 Friends",
+  "100 Games"
 ];
 
-const POSES = [
-  "🕺",
-  "🙆‍♂️",
-  "🙋‍♂️",
-  "💪",
-  "🧍‍♂️",
-  "🤸"
-];
-
-const HUNT_ITEMS = [
-  "phone",
-  "cup",
-  "bottle",
-  "book",
-  "headphones",
-  "keyboard",
-  "mouse",
-  "backpack",
-  "hat",
-  "shoe",
-  "pillow",
-  "chair",
-  "controller",
-  "plant",
-  "lamp",
-  "glasses",
-  "remote",
-  "water bottle",
-  "stuffed animal",
-  "ball"
-];
-
-const LAUGH_ROUNDS = 3;
-const POSE_ROUNDS = 5;
-const FACE_ROUNDS = 5;
-const HUNT_ROUNDS = 5;
-
-function safeSend(ws, payload) {
+function safeSend(ws, data) {
   if (!ws) return;
 
-  try {
-    if (ws.readyState === 1) {
-      ws.send(JSON.stringify(payload));
-    }
-  } catch {}
-}
-
-function send(username, payload) {
-  for (const ws of clients) {
-    if (ws.username === username) {
-      safeSend(ws, payload);
+  if (ws.readyState === 1) {
+    try {
+      ws.send(JSON.stringify(data));
+    } catch (err) {
+      console.warn("Send error:", err.message);
     }
   }
 }
 
-function broadcast(payload) {
-  for (const ws of clients) {
-    safeSend(ws, payload);
+function makeId() {
+  return crypto.randomUUID();
+}
+
+function cleanUsername(name) {
+  if (!name) return "Player";
+
+  return String(name)
+    .replace(/[<>]/g, "")
+    .trim()
+    .slice(0, 20) || "Player";
+}
+
+function getUser(username) {
+  const name = cleanUsername(username);
+
+  if (!users.has(name)) {
+    users.set(name, {
+      username: name,
+      xp: 0,
+      level: 1,
+      wins: 0,
+      losses: 0,
+      games: 0,
+      streak: 0,
+      bestStreak: 0,
+      friends: new Set(),
+      pending: new Set()
+    });
   }
+
+  return users.get(name);
+}
+
+function userPayload(user) {
+  if (!user) return null;
+
+  return {
+    username: user.username,
+    xp: user.xp,
+    level: user.level,
+    wins: user.wins,
+    losses: user.losses,
+    games: user.games,
+    streak: user.streak,
+    bestStreak: user.bestStreak,
+    friends: [...user.friends],
+    pending: [...user.pending]
+  };
 }
 
 function getClientByPlayerId(playerId) {
   for (const ws of clients) {
-    if (ws.__playerId === playerId) return ws;
+    if (ws.__playerId === playerId) {
+      return ws;
+    }
   }
-  return null;
-}
 
-function getRoomPlayer(room, playerId) {
-  if (!room) return null;
-  if (room.a?.playerId === playerId) return room.a;
-  if (room.b?.playerId === playerId) return room.b;
   return null;
 }
 
 function otherPlayer(room, playerId) {
   if (!room) return null;
-  if (room.a?.playerId === playerId) return room.b;
-  if (room.b?.playerId === playerId) return room.a;
+
+  return room.players.find(
+    player => player.playerId !== playerId
+  ) || null;
+}
+
+function roomForPlayer(playerId) {
+  for (const room of rooms.values()) {
+    if (
+      room.players.some(
+        player => player.playerId === playerId
+      )
+    ) {
+      return room;
+    }
+  }
+
   return null;
 }
 
-function roomHasPlayer(room, playerId) {
-  return !!getRoomPlayer(room, playerId);
-}
-
-function removeFromWaiting(ws) {
-  const index = waiting.indexOf(ws);
-  if (index !== -1) waiting.splice(index, 1);
-}
-
-function modeName(mode) {
-  if (mode === "face") return "Face-Off";
-  if (mode === "hunt") return "Emoji Hunt";
-  if (mode === "chat") return "Video Chat";
-  if (mode === "pose") return "Copy the Pose";
-  if (mode === "laugh") return "Make Them Laugh";
-  return mode;
-}
-
-function randomEmoji() {
-  return EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
-}
-
-function randomPose() {
-  return POSES[Math.floor(Math.random() * POSES.length)];
-}
-
-function randomHuntItem() {
-  return HUNT_ITEMS[Math.floor(Math.random() * HUNT_ITEMS.length)];
-}
-
-function ensureFriends(username) {
-  if (!friends.has(username)) {
-    friends.set(username, new Set());
-  }
-  return friends.get(username);
-}
-
-function ensureRequests(username) {
-  if (!friendRequests.has(username)) {
-    friendRequests.set(username, new Set());
-  }
-  return friendRequests.get(username);
-}
-
-function ensureProfile(username) {
-  if (!profiles.has(username)) {
-    profiles.set(username, {
-      username,
-      xp: 0,
-      level: 1,
-      gamesPlayed: 0,
-      wins: 0,
-      streak: 0,
-      bestStreak: 0,
-      badges: new Set(),
-      daily: {
-        date: new Date().toISOString().slice(0, 10),
-        challenges: [],
-        progress: {},
-        completed: []
-      }
-    });
-  }
-
-  const p = profiles.get(username);
-
-  resetDailyIfNeeded(p);
-
-  return p;
-}
-
-function resetDailyIfNeeded(profile) {
-  const today = new Date().toISOString().slice(0, 10);
-
-  if (profile.daily?.date === today) return;
-
-  profile.daily = {
-    date: today,
-    challenges: [],
-    progress: {},
-    completed: []
-  };
-}
-
-function getDailyChallenges(profile) {
-  if (!profile.daily.challenges.length) {
-    const shuffled = [...DAILY_CHALLENGES].sort(() => Math.random() - 0.5);
-
-    profile.daily.challenges = shuffled
-      .slice(0, 3)
-      .map(c => ({ ...c }));
-
-    for (const c of profile.daily.challenges) {
-      profile.daily.progress[c.id] = 0;
-    }
-  }
-
-  return profile.daily.challenges.map(c => ({
-    ...c,
-    progress: profile.daily.progress[c.id] || 0,
-    completed: profile.daily.completed.includes(c.id)
-  }));
-}
-
-function addXp(profile, amount) {
-  profile.xp += Math.max(0, amount);
-
-  profile.level =
-    Math.floor(profile.xp / XP_PER_LEVEL) + 1;
-}
-
-function updateDaily(username, event, amount = 1) {
-  const p = ensureProfile(username);
-  const challenges = getDailyChallenges(p);
-
-  let changed = false;
-
-  for (const c of challenges) {
-    if (c.event !== event) continue;
-    if (p.daily.completed.includes(c.id)) continue;
-
-    const current = p.daily.progress[c.id] || 0;
-
-    const next =
-      event === "streak"
-        ? Math.max(current, amount)
-        : current + amount;
-
-    p.daily.progress[c.id] =
-      Math.min(c.target, next);
-
-    changed = true;
-
-    if (p.daily.progress[c.id] >= c.target) {
-      p.daily.completed.push(c.id);
-
-      addXp(p, c.reward);
-
-      send(p.username, {
-        type: "daily-complete",
-        challengeId: c.id,
-        title: c.title,
-        reward: c.reward
-      });
-    }
-  }
-
-  return changed;
-}
-
-function badgeCheck(profile) {
-  if (profile.gamesPlayed >= 1) {
-    profile.badges.add("first-win");
-  }
-
-  if (profile.bestStreak >= 5) {
-    profile.badges.add("streak-5");
-  }
-
-  if (profile.bestStreak >= 10) {
-    profile.badges.add("streak-10");
-  }
-
-  if (profile.gamesPlayed >= 100) {
-    profile.badges.add("games-100");
-  }
-
-  if (ensureFriends(profile.username).size >= 10) {
-    profile.badges.add("friends-10");
-  }
-}
-
-function profilePayload(username) {
-  const p = ensureProfile(username);
-
-  const xpIntoLevel =
-    p.xp % XP_PER_LEVEL;
-
-  return {
-    type: "profile",
-    username: p.username,
-    xp: p.xp,
-    level: p.level,
-    xpIntoLevel,
-    xpToNextLevel:
-      XP_PER_LEVEL - xpIntoLevel,
-    gamesPlayed: p.gamesPlayed,
-    wins: p.wins,
-    streak: p.streak,
-    bestStreak: p.bestStreak,
-    badges: [...p.badges],
-    daily: {
-      date: p.daily.date,
-      challenges: getDailyChallenges(p)
-    }
-  };
-}
-
-function sendProfile(username) {
-  send(username, profilePayload(username));
-}
-
-function updateProfileAndSend(username) {
-  const p = ensureProfile(username);
-
-  badgeCheck(p);
-
-  sendProfile(username);
-}
-
-function ensureStats(mode, username) {
-  if (!leaderboard[mode]) {
-    leaderboard[mode] = new Map();
-  }
-
-  if (!leaderboard[mode].has(username)) {
-    leaderboard[mode].set(username, {
-      username,
-      wins: 0,
-      games: 0,
-      points: 0
-    });
-  }
-
-  return leaderboard[mode].get(username);
-}
-
-function applyGameResult(room) {
-  if (!room || room.completed) return null;
-
-  room.completed = true;
-
-  const players = [room.a, room.b];
-
-  const scores = room.scores;
-
-  const aScore =
-    scores[room.a.playerId] || 0;
-
-  const bScore =
-    scores[room.b.playerId] || 0;
-
-  const winnerIds =
-    aScore === bScore
-      ? new Set()
-      : new Set([
-          aScore > bScore
-            ? room.a.playerId
-            : room.b.playerId
-        ]);
-
-  for (const player of players) {
-    const stats =
-      ensureStats(room.mode, player.username);
-
-    stats.games += 1;
-
-    stats.points +=
-      scores[player.playerId] || 0;
-
-    const p =
-      ensureProfile(player.username);
-
-    p.gamesPlayed += 1;
-
-    const won =
-      winnerIds.has(player.playerId);
-
-    if (won) {
-      stats.wins += 1;
-
-      p.wins += 1;
-
-      p.streak += 1;
-
-      p.bestStreak =
-        Math.max(
-          p.bestStreak,
-          p.streak
-        );
-    } else if (room.mode !== "chat") {
-      p.streak = 0;
-    }
-
-    let xp =
-      room.mode === "chat"
-        ? 25
-        : 30;
-
-    if (won) xp += 100;
-
-    if (room.mode === "face") {
-      xp += Math.min(
-        50,
-        Math.floor(
-          (scores[player.playerId] || 0) / 10
-        )
-      );
-    }
-
-    if (room.mode === "hunt") {
-      xp +=
-        (scores[player.playerId] || 0) * 10;
-    }
-
-    if (room.mode === "pose") {
-      xp += Math.min(
-        50,
-        Math.floor(
-          (scores[player.playerId] || 0) / 10
-        )
-      );
-    }
-
-    if (room.mode === "laugh") {
-      xp +=
-        (scores[player.playerId] || 0) * 40;
-    }
-
-    addXp(p, xp);
-
-    updateDaily(
-      player.username,
-      "game",
-      1
-    );
-
-    if (won) {
-      updateDaily(
-        player.username,
-        "win",
-        1
-      );
-    }
-
-    if (
-      room.mode === "face" &&
-      (room.bestFaceRound?.[player.playerId] || 0) >= 80
-    ) {
-      updateDaily(
-        player.username,
-        "score80",
-        1
-      );
-    }
-
-    if (
-      room.mode === "face" &&
-      room.perfectFace?.[player.playerId]
-    ) {
-      ensureProfile(
-        player.username
-      ).badges.add(
-        "perfect-face"
-      );
-    }
-
-    if (room.mode === "hunt") {
-      updateDaily(
-        player.username,
-        "hunt",
-        scores[player.playerId] || 0
-      );
-    }
-
-    if (room.mode !== "chat") {
-      updateDaily(
-        player.username,
-        "streak",
-        p.streak
-      );
-    }
-
-    badgeCheck(p);
-  }
-
-  for (const player of players) {
-    updateProfileAndSend(
-      player.username
-    );
-  }
-
-  broadcastLeaderboards();
-
-  return {
-    winnerIds,
-    aScore,
-    bScore
-  };
-}
-
-function recordCompletedGame(room) {
-  return applyGameResult(room);
-}
-
-function leaderboardPayload(mode) {
-  const rows =
-    [...leaderboard[mode].values()]
-      .sort(
-        (a, b) =>
-          b.wins - a.wins ||
-          b.points - a.points ||
-          a.username.localeCompare(b.username)
-      )
-      .slice(0, 10);
-
-  return {
-    mode,
-    rows
-  };
-}
-
-function xpLeaderboardPayload() {
-  const rows =
-    [...profiles.values()]
-      .sort(
-        (a, b) =>
-          b.xp - a.xp ||
-          b.level - a.level ||
-          a.username.localeCompare(b.username)
-      )
-      .slice(0, 10)
-      .map(p => ({
-        username: p.username,
-        xp: p.xp,
-        level: p.level
-      }));
-
-  return {
-    mode: "xp",
-    rows
-  };
-}
-
-function broadcastLeaderboards() {
-  for (const ws of clients) {
-    safeSend(ws, {
-      type: "leaderboards",
-      data: {
-        face: leaderboardPayload("face"),
-        hunt: leaderboardPayload("hunt"),
-        chat: leaderboardPayload("chat"),
-        pose: leaderboardPayload("pose"),
-        laugh: leaderboardPayload("laugh"),
-        xp: xpLeaderboardPayload()
-      }
-    });
-  }
-}
-
-function friendPayload(username) {
-  const f =
-    [...ensureFriends(username)];
-
-  const pending =
-    [...ensureRequests(username)];
-
-  const online =
-    f.filter(name =>
-      [...clients].some(
-        c => c.username === name
-      )
-    );
-
-  return {
-    type: "friends",
-    friends: f,
-    pending,
-    online
-  };
-}
-
-function sendFriends(username) {
-  send(
-    username,
-    friendPayload(username)
-  );
-}
-
-function addFriend(a, b) {
-  if (!a || !b || a === b) return false;
-
-  ensureFriends(a).add(b);
-  ensureFriends(b).add(a);
-
-  ensureRequests(a).delete(b);
-  ensureRequests(b).delete(a);
-
-  updateDaily(a, "friend", 1);
-  updateDaily(b, "friend", 1);
-
-  badgeCheck(ensureProfile(a));
-  badgeCheck(ensureProfile(b));
-
-  sendFriends(a);
-  sendFriends(b);
-
-  updateProfileAndSend(a);
-  updateProfileAndSend(b);
-
-  return true;
+function getRoomPlayer(room, playerId) {
+  return room?.players.find(
+    player => player.playerId === playerId
+  ) || null;
 }
 
 function sendRoomState(room) {
   if (!room) return;
 
-  for (const player of [room.a, room.b]) {
-    const ws = getClientByPlayerId(
-      player.playerId
-    );
+  for (const player of room.players) {
+    const ws = getClientByPlayerId(player.playerId);
 
     if (!ws) continue;
 
-    const opponent =
-      otherPlayer(
-        room,
-        player.playerId
-      );
+    const opponent = otherPlayer(room, player.playerId);
 
     safeSend(ws, {
-      type: "session-restored",
-      mode: room.mode,
-      roomId: room.id,
+      type: "room-state",
+      roomId: room.roomId,
       playerId: player.playerId,
-      opponentId: opponent?.playerId,
-      opponentUsername:
-        opponent?.username || "PLAYER",
+      mode: room.mode,
       role: player.role,
-      round: room.round,
-      totalRounds: room.totalRounds,
-      target: room.target,
-      scores: room.scores
+      username: player.username,
+      opponentUsername: opponent?.username || "Waiting...",
+      target: room.target || null,
+      score: room.scores[player.playerId] || 0,
+      opponentScore: opponent
+        ? room.scores[opponent.playerId] || 0
+        : 0,
+      started: room.started,
+      round: room.round || 1
     });
   }
 }
 
-function endRoom(room) {
+function removeFromWaiting(ws) {
+  for (const mode of Object.keys(waiting)) {
+    waiting[mode] = waiting[mode].filter(
+      item => item.ws !== ws
+    );
+  }
+}
+
+function saveSession(room, player) {
+  if (!player?.sessionId) return;
+
+  sessions.set(player.sessionId, {
+    roomId: room.roomId,
+    playerId: player.playerId
+  });
+}
+
+function restoreSession(ws, sessionId) {
+  if (!sessionId) return false;
+
+  const session = sessions.get(sessionId);
+
+  if (!session) return false;
+
+  const room = rooms.get(session.roomId);
+
+  if (!room) {
+    sessions.delete(sessionId);
+    return false;
+  }
+
+  const player = getRoomPlayer(room, session.playerId);
+
+  if (!player) {
+    sessions.delete(sessionId);
+    return false;
+  }
+
+  player.ws = ws;
+  ws.__playerId = player.playerId;
+  ws.__roomId = room.roomId;
+  ws.__sessionId = sessionId;
+  ws.__username = player.username;
+
+  sendRoomState(room);
+
+  const opponent = otherPlayer(room, player.playerId);
+
+  if (opponent) {
+    const opponentWs = getClientByPlayerId(
+      opponent.playerId
+    );
+
+    safeSend(opponentWs, {
+      type: "session-restored",
+      playerId: player.playerId,
+      opponentUsername: player.username
+    });
+  }
+
+  safeSend(ws, {
+    type: "session-restored",
+    playerId: player.playerId,
+    roomId: room.roomId,
+    opponentUsername: opponent?.username || "Waiting..."
+  });
+
+  return true;
+}
+
+function endRoom(room, reason = "ended") {
   if (!room) return;
 
-  rooms.delete(room.id);
+  rooms.delete(room.roomId);
 
-  for (const player of [room.a, room.b]) {
-    if (
-      sessions.get(player.sessionId)
-        ?.roomId === room.id
-    ) {
-      sessions.delete(
-        player.sessionId
-      );
+  for (const player of room.players) {
+    if (player.sessionId) {
+      sessions.delete(player.sessionId);
     }
 
-    const ws =
-      getClientByPlayerId(
-        player.playerId
-      );
+    const ws = player.ws;
 
     if (ws) {
       ws.__roomId = null;
 
       safeSend(ws, {
-        type: "game-ended"
+        type: "room-ended",
+        reason
       });
     }
   }
 }
 
-function createRoom(a, b, mode) {
-  const roomId =
-    crypto.randomUUID();
+function addXP(username, amount) {
+  const user = getUser(username);
+
+  user.xp += amount;
+
+  while (user.xp >= user.level * 500) {
+    user.xp -= user.level * 500;
+    user.level++;
+  }
+
+  return user;
+}
+
+function recordGame(username, won) {
+  const user = getUser(username);
+
+  user.games++;
+
+  if (won) {
+    user.wins++;
+    user.streak++;
+    user.bestStreak = Math.max(
+      user.bestStreak,
+      user.streak
+    );
+
+    addXP(username, 100);
+  } else {
+    user.losses++;
+    user.streak = 0;
+    addXP(username, 25);
+  }
+
+  return user;
+}
+
+function createRoom(mode, a, b) {
+  const roomId = makeId();
 
   const playerA = {
-    playerId:
-      crypto.randomUUID(),
-    username:
-      a.username,
-    sessionId:
-      a.sessionId,
+    playerId: makeId(),
+    ws: a.ws,
+    username: a.username,
+    sessionId: a.sessionId,
     role: "a"
   };
 
   const playerB = {
-    playerId:
-      crypto.randomUUID(),
-    username:
-      b.username,
-    sessionId:
-      b.sessionId,
+    playerId: makeId(),
+    ws: b.ws,
+    username: b.username,
+    sessionId: b.sessionId,
     role: "b"
   };
 
-  const totalRounds =
-    mode === "face"
-      ? FACE_ROUNDS
-      : mode === "pose"
-      ? POSE_ROUNDS
-      : mode === "laugh"
-      ? LAUGH_ROUNDS
-      : mode === "hunt"
-      ? HUNT_ROUNDS
-      : 1;
-
   const room = {
-    id: roomId,
+    roomId,
     mode,
-    a: playerA,
-    b: playerB,
-    round: 1,
-    totalRounds,
-    target:
-      mode === "face"
-        ? randomEmoji()
-        : mode === "pose"
-        ? randomPose()
-        : mode === "hunt"
-        ? randomHuntItem()
-        : null,
+    players: [playerA, playerB],
+    started: true,
+    target: null,
     scores: {
       [playerA.playerId]: 0,
       [playerB.playerId]: 0
     },
-    roundScores: {},
-    bestFaceRound: {},
-    perfectFace: {},
-    completed: false,
-    disconnected: new Set(),
-    timers: {}
+    round: 1,
+    createdAt: Date.now()
   };
 
   rooms.set(roomId, room);
 
-  a.__roomId = roomId;
-  b.__roomId = roomId;
+  a.ws.__playerId = playerA.playerId;
+  a.ws.__roomId = roomId;
+  a.ws.__sessionId = a.sessionId;
 
-  a.__playerId =
-    playerA.playerId;
+  b.ws.__playerId = playerB.playerId;
+  b.ws.__roomId = roomId;
+  b.ws.__sessionId = b.sessionId;
 
-  b.__playerId =
-    playerB.playerId;
-
-  sessions.set(
-    playerA.sessionId,
-    {
-      roomId,
-      playerId:
-        playerA.playerId,
-      username:
-        playerA.username
-    }
-  );
-
-  sessions.set(
-    playerB.sessionId,
-    {
-      roomId,
-      playerId:
-        playerB.playerId,
-      username:
-        playerB.username
-    }
-  );
-
-  safeSend(a, {
-    type: "matched",
-    mode,
-    roomId,
-    role: "a",
-    playerId:
-      playerA.playerId,
-    opponentId:
-      playerB.playerId,
-    opponentUsername:
-      playerB.username,
-    round: 1,
-    totalRounds,
-    target: room.target
-  });
-
-  safeSend(b, {
-    type: "matched",
-    mode,
-    roomId,
-    role: "b",
-    playerId:
-      playerB.playerId,
-    opponentId:
-      playerA.playerId,
-    opponentUsername:
-      playerA.username,
-    round: 1,
-    totalRounds,
-    target: room.target
-  });
-
-  startRoundTimer(room);
+  saveSession(room, playerA);
+  saveSession(room, playerB);
 
   return room;
 }
 
-function startMatch(a, b, mode) {
-  removeFromWaiting(a);
-  removeFromWaiting(b);
+function startMatch(mode, ws, username, sessionId) {
+  if (!waiting[mode]) {
+    safeSend(ws, {
+      type: "error",
+      message: "Unknown game mode."
+    });
 
-  return createRoom(
-    a,
-    b,
-    mode
-  );
-}
+    return;
+  }
 
-function startRoundTimer(room) {
-  if (!room) return;
+  removeFromWaiting(ws);
 
-  if (room.timers.round) {
-    clearTimeout(
-      room.timers.round
+  const existingRoom = roomForPlayer(ws.__playerId);
+
+  if (existingRoom) {
+    ws.__roomId = existingRoom.roomId;
+
+    const player = getRoomPlayer(
+      existingRoom,
+      ws.__playerId
     );
-  }
 
-  let seconds =
-    room.mode === "face"
-      ? 15
-      : room.mode === "pose"
-      ? 15
-      : room.mode === "laugh"
-      ? 30
-      : room.mode === "hunt"
-      ? 60
-      : 0;
+    if (player) {
+      player.ws = ws;
+      player.username = username;
+      player.sessionId = sessionId;
 
-  if (!seconds) return;
-
-  room.timers.round =
-    setTimeout(() => {
-      finishRound(room);
-    }, seconds * 1000);
-}
-
-function nextTarget(room) {
-  if (room.mode === "face") {
-    return randomEmoji();
-  }
-
-  if (room.mode === "pose") {
-    return randomPose();
-  }
-
-  if (room.mode === "hunt") {
-    return randomHuntItem();
-  }
-
-  return null;
-}
-
-function finishRound(room) {
-  if (!room || room.completed) return;
-
-  const players =
-    [room.a, room.b];
-
-  if (room.mode === "chat") {
-    const result =
-      recordCompletedGame(room);
-
-    for (const player of players) {
-      safeSend(
-        getClientByPlayerId(
-          player.playerId
-        ),
-        {
-          type: "game-result",
-          mode: room.mode,
-          yourScore:
-            room.scores[player.playerId] || 0,
-          opponentScore:
-            room.scores[
-              otherPlayer(
-                room,
-                player.playerId
-              )?.playerId
-            ] || 0,
-          tie:
-            result?.winnerIds?.size === 0
-        }
-      );
+      saveSession(existingRoom, player);
     }
 
+    sendRoomState(existingRoom);
     return;
   }
 
-  room.roundScores =
-    room.roundScores || {};
+  const possibleOpponent = waiting[mode].find(
+    item =>
+      item.ws !== ws &&
+      item.ws.readyState === 1
+  );
 
-  room.roundScores[room.round] =
-    { ...room.scores };
+  if (possibleOpponent) {
+    waiting[mode] = waiting[mode].filter(
+      item => item !== possibleOpponent
+    );
 
-  if (
-    room.round >=
-    room.totalRounds
-  ) {
-    const result =
-      recordCompletedGame(room);
+    const room = createRoom(
+      mode,
+      {
+        ws: possibleOpponent.ws,
+        username: possibleOpponent.username,
+        sessionId: possibleOpponent.sessionId
+      },
+      {
+        ws,
+        username,
+        sessionId
+      }
+    );
 
-    for (const player of players) {
-      const ws =
-        getClientByPlayerId(
-          player.playerId
-        );
-
-      safeSend(ws, {
-        type: "game-result",
-        mode: room.mode,
-        yourScore:
-          room.scores[player.playerId] || 0,
-        opponentScore:
-          room.scores[
-            otherPlayer(
-              room,
-              player.playerId
-            )?.playerId
-          ] || 0,
-        tie:
-          result?.winnerIds?.size === 0
-      });
-    }
-
-    return;
-  }
-
-  room.round += 1;
-
-  room.target =
-    nextTarget(room);
-
-  room.scores = {
-    [room.a.playerId]:
-      room.scores[room.a.playerId] || 0,
-    [room.b.playerId]:
-      room.scores[room.b.playerId] || 0
-  };
-
-  for (const player of players) {
-    const ws =
-      getClientByPlayerId(
-        player.playerId
-      );
-
-    if (!ws) continue;
+    safeSend(possibleOpponent.ws, {
+      type: "match-found",
+      roomId: room.roomId,
+      mode,
+      playerId: room.players[0].playerId,
+      role: "a",
+      opponentUsername: username
+    });
 
     safeSend(ws, {
-      type: "new-round",
-      mode: room.mode,
-      round: room.round,
-      totalRounds:
-        room.totalRounds,
-      target: room.target
+      type: "match-found",
+      roomId: room.roomId,
+      mode,
+      playerId: room.players[1].playerId,
+      role: "b",
+      opponentUsername: possibleOpponent.username
     });
-  }
 
-  startRoundTimer(room);
-}
+    sendRoomState(room);
 
-function requeueAfterSkip(ws) {
-  if (!ws) return;
-
-  const mode =
-    ws.__mode;
-
-  if (!mode) return;
-
-  removeFromWaiting(ws);
-
-  ws.__roomId = null;
-
-  waiting.push(ws);
-
-  safeSend(ws, {
-    type: "waiting",
-    mode,
-    message:
-      "Looking for another player..."
-  });
-
-  tryMatch(mode);
-}
-
-function tryMatch(mode) {
-  const eligible =
-    waiting.filter(
-      ws =>
-        ws.__mode === mode &&
-        ws.readyState === 1
-    );
-
-  while (eligible.length >= 2) {
-    const a =
-      eligible.shift();
-
-    const b =
-      eligible.shift();
-
-    const ia =
-      waiting.indexOf(a);
-
-    if (ia !== -1)
-      waiting.splice(ia, 1);
-
-    const ib =
-      waiting.indexOf(b);
-
-    if (ib !== -1)
-      waiting.splice(ib, 1);
-
-    if (
-      a === b ||
-      a.readyState !== 1 ||
-      b.readyState !== 1
-    ) {
-      if (
-        a.readyState === 1 &&
-        a !== b
-      ) {
-        waiting.push(a);
-      }
-
-      if (
-        b.readyState === 1
-      ) {
-        waiting.push(b);
-      }
-
-      continue;
-    }
-
-    startMatch(
-      a,
-      b,
-      mode
-    );
-  }
-}
-
-function findMatch(ws, mode) {
-  ws.__mode = mode;
-
-  const existingSession =
-    sessions.get(
-      ws.sessionId
-    );
-
-  if (existingSession) {
-    const room =
-      rooms.get(
-        existingSession.roomId
-      );
-
-    if (
-      room &&
-      roomHasPlayer(
-        room,
-        existingSession.playerId
-      )
-    ) {
-      ws.__playerId =
-        existingSession.playerId;
-
-      ws.__roomId =
-        room.id;
-
-      sendRoomState(room);
-
-      return;
-    }
-  }
-
-  removeFromWaiting(ws);
-
-  ws.__roomId = null;
-
-  for (const room of rooms.values()) {
-    if (
-      room.mode === mode &&
-      roomHasPlayer(
-        room,
-        ws.__playerId
-      )
-    ) {
-      ws.__roomId = room.id;
-
-      sendRoomState(room);
-
-      return;
-    }
-  }
-
-  waiting.push(ws);
-
-  safeSend(ws, {
-    type: "waiting",
-    mode,
-    message:
-      "Looking for another player..."
-  });
-
-  tryMatch(mode);
-}
-
-function handleFaceScore(ws, message) {
-  const room =
-    rooms.get(ws.__roomId);
-
-  if (!room) return;
-
-  if (
-    room.mode !== "face" ||
-    room.completed
-  ) return;
-
-  const score =
-    Math.max(
-      0,
-      Math.min(
-        100,
-        Number(message.score) || 0
-      )
-    );
-
-  room.scores[
-    ws.__playerId
-  ] =
-    Math.max(
-      room.scores[
-        ws.__playerId
-      ] || 0,
-      score
-    );
-
-  room.bestFaceRound =
-    room.bestFaceRound || {};
-
-  room.bestFaceRound[
-    ws.__playerId
-  ] =
-    Math.max(
-      room.bestFaceRound[
-        ws.__playerId
-      ] || 0,
-      score
-    );
-
-  if (score >= 98) {
-    room.perfectFace =
-      room.perfectFace || {};
-
-    room.perfectFace[
-      ws.__playerId
-    ] = true;
-  }
-
-  safeSend(
-    getClientByPlayerId(
-      ws.__playerId
-    ),
-    {
-      type: "your-score",
-      score
-    }
-  );
-
-  finishRoundIfBothScored(room);
-}
-
-function finishRoundIfBothScored(room) {
-  if (!room) return;
-
-  const aScore =
-    room.scores[
-      room.a.playerId
-    ];
-
-  const bScore =
-    room.scores[
-      room.b.playerId
-    ];
-
-  if (
-    typeof aScore !== "number" ||
-    typeof bScore !== "number"
-  ) {
     return;
   }
 
-  if (
-    room.mode === "face" ||
-    room.mode === "pose"
-  ) {
-    const bothHaveScores =
-      aScore >= 0 &&
-      bScore >= 0;
+  waiting[mode].push({
+    ws,
+    username,
+    sessionId
+  });
 
-    if (bothHaveScores) {
-      setTimeout(() => {
-        if (
-          rooms.has(room.id) &&
-          !room.completed
-        ) {
-          finishRound(room);
-        }
-      }, 700);
-    }
-  }
-}
-
-function handlePoseScore(ws, message) {
-  const room =
-    rooms.get(ws.__roomId);
-
-  if (!room) return;
-
-  if (
-    room.mode !== "pose" ||
-    room.completed
-  ) return;
-
-  const score =
-    Math.max(
-      0,
-      Math.min(
-        100,
-        Number(message.score) || 0
-      )
-    );
-
-  room.scores[
-    ws.__playerId
-  ] =
-    Math.max(
-      room.scores[
-        ws.__playerId
-      ] || 0,
-      score
-    );
-
-  finishRoundIfBothScored(room);
-}
-
-function handleHuntFound(ws) {
-  const room =
-    rooms.get(ws.__roomId);
-
-  if (!room) return;
-
-  if (
-    room.mode !== "hunt" ||
-    room.completed
-  ) return;
-
-  room.scores[
-    ws.__playerId
-  ] =
-    (room.scores[
-      ws.__playerId
-    ] || 0) + 1;
-
-  for (const player of [
-    room.a,
-    room.b
-  ]) {
-    safeSend(
-      getClientByPlayerId(
-        player.playerId
-      ),
-      {
-        type: "hunt-found",
-        playerId:
-          ws.__playerId,
-        username:
-          ws.username,
-        scores:
-          room.scores
-      }
-    );
-  }
-
-  finishRound(room);
-}
-
-function handleLaugh(ws) {
-  const room =
-    rooms.get(ws.__roomId);
-
-  if (!room) return;
-
-  if (
-    room.mode !== "laugh" ||
-    room.completed
-  ) return;
-
-  const opponent =
-    otherPlayer(
-      room,
-      ws.__playerId
-    );
-
-  if (!opponent) return;
-
-  room.scores[
-    opponent.playerId
-  ] =
-    (room.scores[
-      opponent.playerId
-    ] || 0) + 1;
-
-  for (const player of [
-    room.a,
-    room.b
-  ]) {
-    safeSend(
-      getClientByPlayerId(
-        player.playerId
-      ),
-      {
-        type: "laugh-scored",
-        playerId:
-          opponent.playerId,
-        username:
-          opponent.username,
-        scores:
-          room.scores
-      }
-    );
-  }
-
-  finishRound(room);
-}
-
-function handleChatMessage(ws, message) {
-  const room =
-    rooms.get(ws.__roomId);
-
-  if (!room) return;
-
-  if (
-    room.mode !== "chat" ||
-    room.completed
-  ) return;
-
-  const text =
-    String(message.text || "")
-      .slice(0, 500);
-
-  if (!text) return;
-
-  const opponent =
-    otherPlayer(
-      room,
-      ws.__playerId
-    );
-
-  if (!opponent) return;
-
-  safeSend(
-    getClientByPlayerId(
-      opponent.playerId
-    ),
-    {
-      type: "chat-message",
-      username:
-        ws.username,
-      text
-    }
-  );
-}
-
-function explicitLeave(ws) {
-  removeFromWaiting(ws);
-
-  const room =
-    rooms.get(ws.__roomId);
-
-  if (room) {
-    const opponent =
-      otherPlayer(
-        room,
-        ws.__playerId
-      );
-
-    if (opponent) {
-      const opponentWs =
-        getClientByPlayerId(
-          opponent.playerId
-        );
-
-      safeSend(
-        opponentWs,
-        {
-          type: "opponent-left"
-        }
-      );
-    }
-
-    endRoom(room);
-  }
-
-  if (ws.sessionId) {
-    sessions.delete(
-      ws.sessionId
-    );
-  }
-
-  ws.__roomId = null;
+  safeSend(ws, {
+    type: "waiting",
+    mode
+  });
 }
 
 wss.on("connection", ws => {
   clients.add(ws);
 
-  ws.__playerId =
-    crypto.randomUUID();
-
-  ws.sessionId =
-    crypto.randomUUID();
-
-  ws.username =
-    "Player" +
-    Math.floor(
-      Math.random() * 10000
-    );
-
-  ws.__mode = null;
+  ws.__playerId = null;
   ws.__roomId = null;
-  ws.__intentionalClose = false;
+  ws.__sessionId = null;
+  ws.__username = "Player";
 
   safeSend(ws, {
-    type: "connected",
-    playerId:
-      ws.__playerId
+    type: "connected"
   });
 
   ws.on("message", raw => {
     let message;
 
     try {
-      message =
-        JSON.parse(
-          raw.toString()
-        );
+      message = JSON.parse(raw.toString());
     } catch {
+      safeSend(ws, {
+        type: "error",
+        message: "Invalid message."
+      });
+
       return;
     }
 
-    const type =
-      message.type;
+    const type = message.type;
 
     if (type === "set-username") {
-      const oldUsername =
-        ws.username;
+      const username = cleanUsername(message.username);
+      const sessionId =
+        message.sessionId || makeId();
 
-      const username =
-        String(
-          message.username ||
-          ""
-        )
-          .trim()
-          .slice(0, 24);
+      ws.__username = username;
+      ws.__sessionId = sessionId;
 
-      if (username) {
-        ws.username =
-          username;
-      }
-
-      if (message.sessionId) {
-        ws.sessionId =
-          String(
-            message.sessionId
-          );
-
-        const existing =
-          sessions.get(
-            ws.sessionId
-          );
-
-        if (existing) {
-          ws.__playerId =
-            existing.playerId;
-
-          ws.username =
-            existing.username ||
-            ws.username;
-
-          const room =
-            rooms.get(
-              existing.roomId
-            );
-
-          if (room) {
-            ws.__roomId =
-              room.id;
-
-            sendRoomState(
-              room
-            );
-          }
-        }
-      }
-
-      ensureProfile(
-        ws.username
+      const restored = restoreSession(
+        ws,
+        sessionId
       );
 
-      if (
-        oldUsername !==
-        ws.username
-      ) {
-        sendProfile(
-          ws.username
-        );
-      }
+      if (!restored) {
+        ws.__playerId = ws.__playerId || makeId();
 
-      safeSend(ws, {
-        type: "username-saved",
-        username:
-          ws.username
-      });
+        getUser(username);
 
-      sendFriends(
-        ws.username
-      );
-
-      broadcast({
-        type: "online-count",
-        count:
-          clients.size
-      });
-
-      broadcastLeaderboards();
-
-      return;
-    }
-
-    if (type === "get-profile") {
-      sendProfile(
-        ws.username
-      );
-      return;
-    }
-
-    if (type === "get-friends") {
-      sendFriends(
-        ws.username
-      );
-      return;
-    }
-
-    if (type === "friend-request") {
-      const target =
-        String(
-          message.username ||
-          ""
-        )
-          .trim()
-          .slice(0, 24);
-
-      if (
-        !target ||
-        target === ws.username
-      ) {
         safeSend(ws, {
-          type: "friend-result",
-          ok: false,
-          message:
-            "Invalid username."
+          type: "username-set",
+          username,
+          sessionId,
+          playerId: ws.__playerId
         });
-        return;
-      }
-
-      const targetExists =
-        [...clients].some(
-          c =>
-            c.username ===
-            target
-        );
-
-      if (!targetExists) {
+      } else {
         safeSend(ws, {
-          type: "friend-result",
-          ok: false,
-          message:
-            "That player is not online."
+          type: "username-set",
+          username,
+          sessionId,
+          playerId: ws.__playerId
         });
-        return;
       }
-
-      if (
-        ensureFriends(
-          ws.username
-        ).has(target)
-      ) {
-        safeSend(ws, {
-          type: "friend-result",
-          ok: false,
-          message:
-            "You are already friends."
-        });
-        return;
-      }
-
-      ensureRequests(
-        target
-      ).add(
-        ws.username
-      );
-
-      safeSend(ws, {
-        type: "friend-result",
-        ok: true,
-        message:
-          "Friend request sent!"
-      });
-
-      send(
-        target,
-        {
-          type:
-            "friend-request-received",
-          username:
-            ws.username
-        }
-      );
-
-      sendFriends(target);
-
-      return;
-    }
-
-    if (type === "friend-accept") {
-      const requester =
-        String(
-          message.username ||
-          ""
-        )
-          .trim()
-          .slice(0, 24);
-
-      if (
-        !ensureRequests(
-          ws.username
-        ).has(requester)
-      ) {
-        safeSend(ws, {
-          type: "friend-result",
-          ok: false,
-          message:
-            "Friend request not found."
-        });
-        return;
-      }
-
-      addFriend(
-        ws.username,
-        requester
-      );
-
-      safeSend(ws, {
-        type: "friend-result",
-        ok: true,
-        message:
-          "Friend request accepted!"
-      });
 
       return;
     }
 
     if (type === "find-match") {
-      const mode =
-        String(
-          message.mode || ""
-        );
+      const mode = String(
+        message.mode || "face"
+      ).toLowerCase();
 
-      if (
-        ![
-          "face",
-          "hunt",
-          "chat",
-          "pose",
-          "laugh"
-        ].includes(mode)
-      ) {
-        return;
-      }
+      const username = cleanUsername(
+        message.username || ws.__username
+      );
 
-      findMatch(
+      const sessionId =
+        message.sessionId ||
+        ws.__sessionId ||
+        makeId();
+
+      ws.__username = username;
+      ws.__sessionId = sessionId;
+
+      getUser(username);
+
+      startMatch(
+        mode,
         ws,
-        mode
+        username,
+        sessionId
       );
 
       return;
     }
 
-    if (type === "face-score") {
-      handleFaceScore(
-        ws,
-        message
-      );
-      return;
-    }
+    if (type === "leave") {
+      removeFromWaiting(ws);
 
-    if (type === "pose-score") {
-      handlePoseScore(
-        ws,
-        message
-      );
-      return;
-    }
-
-    if (type === "hunt-found") {
-      handleHuntFound(ws);
-      return;
-    }
-
-    if (type === "laugh") {
-      handleLaugh(ws);
-      return;
-    }
-
-    if (type === "chat-message") {
-      handleChatMessage(
-        ws,
-        message
-      );
-      return;
-    }
-
-    if (type === "skip") {
-      const room =
-        rooms.get(
-          ws.__roomId
-        );
+      const room = rooms.get(ws.__roomId);
 
       if (room) {
-        const opponent =
-          otherPlayer(
-            room,
-            ws.__playerId
+        const player = getRoomPlayer(
+          room,
+          ws.__playerId
+        );
+
+        if (player?.sessionId) {
+          sessions.delete(
+            player.sessionId
           );
+        }
+
+        const opponent = otherPlayer(
+          room,
+          ws.__playerId
+        );
 
         if (opponent) {
           const opponentWs =
@@ -1828,221 +574,581 @@ wss.on("connection", ws => {
               opponent.playerId
             );
 
-          safeSend(
-            opponentWs,
-            {
-              type:
-                "opponent-skipped"
-            }
-          );
+          safeSend(opponentWs, {
+            type: "opponent-left"
+          });
         }
 
-        endRoom(room);
+        endRoom(room, "left");
       }
 
-      requeueAfterSkip(ws);
-
-      return;
-    }
-
-    if (type === "leave") {
-      ws.__intentionalClose =
-        true;
-
-      explicitLeave(ws);
-
-      return;
-    }
-
-    if (type === "report") {
-      const reason =
-        String(
-          message.reason ||
-          "Other"
-        )
-          .slice(0, 200);
-
-      reports.push({
-        id:
-          crypto.randomUUID(),
-        from:
-          ws.username,
-        reason,
-        createdAt:
-          new Date().toISOString()
-      });
-
-      if (
-        reports.length >
-        MAX_REPORTS
-      ) {
-        reports.shift();
-      }
+      ws.__roomId = null;
 
       safeSend(ws, {
-        type: "report-result",
-        ok: true,
-        message:
-          "Report submitted."
+        type: "left"
       });
 
       return;
     }
 
-    if (type === "dm-send") {
-      const to =
-        String(
-          message.to || ""
-        )
-          .trim()
-          .slice(0, 24);
+    if (type === "signal") {
+      const room = rooms.get(
+        ws.__roomId
+      );
 
-      const text =
-        String(
-          message.text || ""
-        )
-          .slice(0, 500);
+      if (!room) return;
 
-      if (!to || !text) return;
+      const opponent = otherPlayer(
+        room,
+        ws.__playerId
+      );
 
-      const key =
-        [ws.username, to]
-          .sort()
-          .join("|");
+      if (!opponent) return;
 
-      if (
-        !dmHistory.has(key)
-      ) {
-        dmHistory.set(
-          key,
-          []
+      const opponentWs =
+        getClientByPlayerId(
+          opponent.playerId
         );
-      }
 
-      const history =
-        dmHistory.get(key);
-
-      history.push({
-        from:
-          ws.username,
-        to,
-        text,
-        time:
-          new Date().toISOString()
+      safeSend(opponentWs, {
+        type: "signal",
+        signal: message.signal
       });
 
-      if (history.length > 100) {
-        history.shift();
+      return;
+    }
+
+    if (type === "face-score") {
+      const room = rooms.get(
+        ws.__roomId
+      );
+
+      if (!room) return;
+
+      const score = Math.max(
+        0,
+        Math.min(
+          100,
+          Number(message.score) || 0
+        )
+      );
+
+      room.scores[ws.__playerId] = score;
+
+      const opponent =
+        otherPlayer(
+          room,
+          ws.__playerId
+        );
+
+      const opponentWs =
+        opponent
+          ? getClientByPlayerId(
+              opponent.playerId
+            )
+          : null;
+
+      safeSend(opponentWs, {
+        type: "opponent-score",
+        score
+      });
+
+      safeSend(ws, {
+        type: "score-updated",
+        score
+      });
+
+      return;
+    }
+
+    if (type === "face-round-finished") {
+      const room = rooms.get(
+        ws.__roomId
+      );
+
+      if (!room) return;
+
+      const opponent =
+        otherPlayer(
+          room,
+          ws.__playerId
+        );
+
+      if (!opponent) return;
+
+      const aScore =
+        room.scores[
+          room.players[0].playerId
+        ] || 0;
+
+      const bScore =
+        room.scores[
+          room.players[1].playerId
+        ] || 0;
+
+      let winner = null;
+
+      if (aScore > bScore) {
+        winner =
+          room.players[0].playerId;
+      } else if (bScore > aScore) {
+        winner =
+          room.players[1].playerId;
       }
 
-      send(to, {
-        type: "dm-message",
-        from:
-          ws.username,
+      for (const player of room.players) {
+        const won =
+          winner === player.playerId;
+
+        recordGame(
+          player.username,
+          won
+        );
+
+        const playerWs =
+          getClientByPlayerId(
+            player.playerId
+          );
+
+        safeSend(playerWs, {
+          type: "round-result",
+          winner,
+          myScore:
+            room.scores[
+              player.playerId
+            ] || 0,
+          opponentScore:
+            room.scores[
+              otherPlayer(
+                room,
+                player.playerId
+              )?.playerId
+            ] || 0,
+          progress:
+            userPayload(
+              getUser(player.username)
+            )
+        });
+      }
+
+      return;
+    }
+
+    if (type === "chat-message") {
+      const room = rooms.get(
+        ws.__roomId
+      );
+
+      if (!room) return;
+
+      const text = String(
+        message.text || ""
+      )
+        .replace(/[<>]/g, "")
+        .trim()
+        .slice(0, 300);
+
+      if (!text) return;
+
+      const opponent =
+        otherPlayer(
+          room,
+          ws.__playerId
+        );
+
+      if (!opponent) return;
+
+      const opponentWs =
+        getClientByPlayerId(
+          opponent.playerId
+        );
+
+      safeSend(opponentWs, {
+        type: "chat-message",
+        username: ws.__username,
         text
       });
 
       return;
     }
 
-    if (type === "dm-history") {
-      const other =
-        String(
-          message.username ||
-          ""
-        )
-          .trim()
-          .slice(0, 24);
+    if (type === "hunt-found") {
+      const room = rooms.get(
+        ws.__roomId
+      );
 
-      const key =
-        [ws.username, other]
-          .sort()
-          .join("|");
+      if (!room) return;
+
+      const opponent =
+        otherPlayer(
+          room,
+          ws.__playerId
+        );
+
+      if (!opponent) return;
+
+      const points =
+        Math.max(
+          0,
+          Number(message.points) || 100
+        );
+
+      room.scores[ws.__playerId] =
+        (room.scores[ws.__playerId] || 0) +
+        points;
+
+      const opponentWs =
+        getClientByPlayerId(
+          opponent.playerId
+        );
 
       safeSend(ws, {
-        type: "dm-history",
-        username: other,
-        messages:
-          dmHistory.get(key) ||
-          []
+        type: "hunt-success",
+        score:
+          room.scores[ws.__playerId]
+      });
+
+      safeSend(opponentWs, {
+        type: "opponent-hunt-success",
+        score:
+          room.scores[ws.__playerId]
+      });
+
+      return;
+    }
+
+    if (type === "hunt-timeout") {
+      const room = rooms.get(
+        ws.__roomId
+      );
+
+      if (!room) return;
+
+      const opponent =
+        otherPlayer(
+          room,
+          ws.__playerId
+        );
+
+      if (!opponent) return;
+
+      const opponentWs =
+        getClientByPlayerId(
+          opponent.playerId
+        );
+
+      safeSend(opponentWs, {
+        type: "hunt-opponent-timeout"
+      });
+
+      safeSend(ws, {
+        type: "hunt-timeout"
+      });
+
+      return;
+    }
+
+    if (type === "skip") {
+      const room = rooms.get(
+        ws.__roomId
+      );
+
+      if (!room) return;
+
+      const opponent =
+        otherPlayer(
+          room,
+          ws.__playerId
+        );
+
+      if (!opponent) return;
+
+      const opponentWs =
+        getClientByPlayerId(
+          opponent.playerId
+        );
+
+      safeSend(opponentWs, {
+        type: "skip-requested",
+        username: ws.__username
+      });
+
+      safeSend(ws, {
+        type: "skip-requested",
+        username: ws.__username
+      });
+
+      return;
+    }
+
+    if (type === "friend-request") {
+      const targetName = cleanUsername(
+        message.username ||
+        message.to
+      );
+
+      const fromUser = getUser(
+        ws.__username
+      );
+
+      const targetUser =
+        users.get(targetName);
+
+      if (!targetUser) {
+        safeSend(ws, {
+          type: "friend-result",
+          ok: false,
+          message:
+            "That user is not online."
+        });
+
+        return;
+      }
+
+      if (
+        targetUser.username ===
+        fromUser.username
+      ) {
+        safeSend(ws, {
+          type: "friend-result",
+          ok: false,
+          message:
+            "You cannot add yourself."
+        });
+
+        return;
+      }
+
+      if (
+        fromUser.friends.has(
+          targetUser.username
+        )
+      ) {
+        safeSend(ws, {
+          type: "friend-result",
+          ok: false,
+          message:
+            "You are already friends."
+        });
+
+        return;
+      }
+
+      targetUser.pending.add(
+        fromUser.username
+      );
+
+      safeSend(ws, {
+        type: "friend-result",
+        ok: true,
+        message:
+          "Friend request sent."
+      });
+
+      const targetWs =
+        [...clients].find(
+          client =>
+            client.__username ===
+            targetUser.username
+        );
+
+      safeSend(targetWs, {
+        type: "friend-request-received",
+        username:
+          fromUser.username
+      });
+
+      return;
+    }
+
+    if (type === "friend-accept") {
+      const requester =
+        cleanUsername(
+          message.username ||
+          message.from
+        );
+
+      const me = getUser(
+        ws.__username
+      );
+
+      const requesterUser =
+        users.get(requester);
+
+      if (!requesterUser) {
+        safeSend(ws, {
+          type: "friend-result",
+          ok: false,
+          message:
+            "That user is no longer online."
+        });
+
+        return;
+      }
+
+      if (
+        !me.pending.has(requester)
+      ) {
+        safeSend(ws, {
+          type: "friend-result",
+          ok: false,
+          message:
+            "Friend request not found."
+        });
+
+        return;
+      }
+
+      me.pending.delete(
+        requester
+      );
+
+      me.friends.add(
+        requester
+      );
+
+      requesterUser.friends.add(
+        me.username
+      );
+
+      safeSend(ws, {
+        type: "friend-result",
+        ok: true,
+        message:
+          "Friend request accepted.",
+        friends:
+          [...me.friends],
+        pending:
+          [...me.pending]
+      });
+
+      const requesterWs =
+        [...clients].find(
+          client =>
+            client.__username ===
+            requester
+        );
+
+      safeSend(requesterWs, {
+        type: "friend-result",
+        ok: true,
+        message:
+          `${me.username} accepted your friend request.`,
+        friends:
+          [...requesterUser.friends],
+        pending:
+          [...requesterUser.pending]
+      });
+
+      return;
+    }
+
+    if (type === "get-friends") {
+      const user = getUser(
+        ws.__username
+      );
+
+      safeSend(ws, {
+        type: "friends-list",
+        friends:
+          [...user.friends],
+        pending:
+          [...user.pending]
+      });
+
+      return;
+    }
+
+    if (type === "get-progress") {
+      const user = getUser(
+        ws.__username
+      );
+
+      safeSend(ws, {
+        type: "progress",
+        data: userPayload(user),
+        dailyChallenges,
+        badges
+      });
+
+      return;
+    }
+
+    if (type === "leaderboard") {
+      const list = [
+        ...users.values()
+      ]
+        .sort(
+          (a, b) =>
+            (b.xp + b.wins * 100) -
+            (a.xp + a.wins * 100)
+        )
+        .slice(0, 20)
+        .map((user, index) => ({
+          rank: index + 1,
+          username:
+            user.username,
+          xp: user.xp,
+          level:
+            user.level,
+          wins:
+            user.wins,
+          games:
+            user.games
+        }));
+
+      safeSend(ws, {
+        type: "leaderboard",
+        users: list
       });
 
       return;
     }
 
     if (type === "invite") {
-      const target =
-        String(
-          message.username ||
-          ""
-        )
-          .trim()
-          .slice(0, 24);
-
-      if (!target) return;
-
-      const inviteId =
-        crypto.randomUUID();
-
-      pendingInvites.set(
-        inviteId,
-        {
-          from:
-            ws.username,
-          to: target,
-          mode:
-            message.mode || "face",
-          createdAt:
-            Date.now()
-        }
+      const targetName = cleanUsername(
+        message.username ||
+        message.to
       );
 
-      send(target, {
+      const targetWs =
+        [...clients].find(
+          client =>
+            client.__username ===
+            targetName
+        );
+
+      if (!targetWs) {
+        safeSend(ws, {
+          type: "invite-result",
+          ok: false,
+          message:
+            "That player is not online."
+        });
+
+        return;
+      }
+
+      safeSend(targetWs, {
         type: "invite-received",
-        inviteId,
         from:
-          ws.username,
+          ws.__username,
         mode:
           message.mode || "face"
+      });
+
+      safeSend(ws, {
+        type: "invite-result",
+        ok: true
       });
 
       return;
     }
 
-    if (type === "invite-accept") {
-      const invite =
-        pendingInvites.get(
-          message.inviteId
-        );
-
-      if (!invite) return;
-
-      pendingInvites.delete(
-        message.inviteId
-      );
-
-      const inviter =
-        [...clients].find(
-          c =>
-            c.username ===
-            invite.from
-        );
-
-      if (!inviter) return;
-
-      removeFromWaiting(
-        ws
-      );
-
-      removeFromWaiting(
-        inviter
-      );
-
-      startMatch(
-        inviter,
-        ws,
-        invite.mode
-      );
+    if (type === "ping") {
+      safeSend(ws, {
+        type: "pong"
+      });
 
       return;
     }
@@ -2053,98 +1159,59 @@ wss.on("connection", ws => {
 
     removeFromWaiting(ws);
 
-    broadcast({
-      type: "online-count",
-      count:
-        clients.size
-    });
-
     /*
       IMPORTANT:
+      Do NOT end the game when a player disconnects.
 
-      If the connection disappears unexpectedly,
-      DO NOT destroy the room.
-
-      The player's session remains alive so they
-      can reconnect and return to the same game.
+      The session stays alive so the player can reconnect
+      after Wi-Fi problems, browser freezes, or accidental
+      connection drops.
     */
 
-    if (
-      !ws.__intentionalClose &&
+    const room = rooms.get(
       ws.__roomId
-    ) {
-      const room =
-        rooms.get(
-          ws.__roomId
-        );
+    );
 
-      if (room) {
-        room.disconnected.add(
+    if (room) {
+      const player = getRoomPlayer(
+        room,
+        ws.__playerId
+      );
+
+      if (player) {
+        player.ws = null;
+      }
+
+      const opponent =
+        otherPlayer(
+          room,
           ws.__playerId
         );
 
-        const opponent =
-          otherPlayer(
-            room,
-            ws.__playerId
+      if (opponent) {
+        const opponentWs =
+          getClientByPlayerId(
+            opponent.playerId
           );
 
-        if (opponent) {
-          safeSend(
-            getClientByPlayerId(
-              opponent.playerId
-            ),
-            {
-              type:
-                "opponent-temporarily-disconnected"
-            }
-          );
-        }
-      }
-
-      return;
-    }
-
-    if (
-      ws.__intentionalClose
-    ) {
-      return;
-    }
-
-    if (ws.sessionId) {
-      const session =
-        sessions.get(
-          ws.sessionId
-        );
-
-      if (!session) {
-        return;
+        safeSend(opponentWs, {
+          type:
+            "opponent-temporarily-disconnected"
+        });
       }
     }
   });
 });
 
-app.use(
-  express.static(
-    path.join(
-      __dirname,
-      "public"
-    )
-  )
-);
-
-app.get(
-  "*",
-  (req, res) => {
-    res.sendFile(
-      path.join(
-        __dirname,
-        "public",
-        "index.html"
-      )
-    );
+setInterval(() => {
+  for (const ws of clients) {
+    if (ws.readyState === 1) {
+      safeSend(ws, {
+        type: "server-ping"
+      });
+    }
   }
-);
+}, 25000);
 
 server.listen(
   PORT,
