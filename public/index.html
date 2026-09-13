@@ -35,19 +35,6 @@
         <button class="secondary" id="friendsToggle">👥 FRIENDS</button>
       </div>
 
-      <div class="profilePanel">
-        <div class="leaderHead"><h3>👤 Your Progress</h3><span class="tiny" id="profileLevelLabel">Level 1</span></div>
-        <div class="profileGrid">
-          <div class="statBox"><div class="statLabel">XP</div><div class="statValue" id="profileXp">0</div><div class="xpTrack"><div id="profileXpBar"></div></div><div class="challengeMeta" id="profileXpText">0 / 500 to next level</div></div>
-          <div class="statBox"><div class="statLabel">Level</div><div class="statValue" id="profileLevel">1</div></div>
-          <div class="statBox"><div class="statLabel">🔥 Streak</div><div class="statValue" id="profileStreak">0</div></div>
-          <div class="statBox"><div class="statLabel">Best Streak</div><div class="statValue" id="profileBestStreak">0</div></div>
-        </div>
-        <div class="profileSections">
-          <div class="leaderTable"><h4>🎯 Daily Challenges</h4><div id="dailyChallenges" class="challengeList"><div class="leaderEmpty">Loading today’s challenges…</div></div></div>
-          <div class="leaderTable"><h4>🏅 Badges</h4><div id="badgeList" class="badgeGrid"></div><div class="challengeMeta">Earn badges by playing and hitting milestones.</div></div>
-        </div>
-      </div>
 
       <div id="leaderPanel" class="leaderPanel hiddenPanel">
         <div class="leaderHead"><h3>🏆 Leaderboards</h3><span class="tiny">Top 20</span></div>
@@ -60,6 +47,7 @@
       </div>
 
       <div class="emoji">🎮</div>
+
       <h1>Choose Your Game</h1>
       <p>Play against a random person with your camera. Pick a mode and jump in.</p>
 
@@ -67,6 +55,20 @@
         <div class="mode"><div class="modeEmoji">😀</div><h2>Emoji Face-Off</h2><p>Copy the emoji with your face. AI face landmarks score how closely you match it.</p><button data-mode="face">PLAY FACE-OFF</button></div>
         <div class="mode"><div class="modeEmoji">📹</div><h2>Video Chat</h2><p>A simple random video chat mode. No emoji and no scoring — just talk.</p><button data-mode="chat">START VIDEO CHAT</button></div>
         <div class="mode"><div class="modeEmoji">🧻</div><h2>Emoji Hunt</h2><p>Find the real-world item shown by the emoji. AI checks your camera and awards the point.</p><button data-mode="hunt">START EMOJI HUNT</button></div>
+      </div>
+
+      <div class="profilePanel">
+        <div class="leaderHead"><h3>👤 Your Progress</h3><span class="tiny" id="profileLevelLabel">Level 1</span></div>
+        <div class="profileGrid">
+          <div class="statBox"><div class="statLabel">XP</div><div class="statValue" id="profileXp">0</div><div class="xpTrack"><div id="profileXpBar"></div></div><div class="challengeMeta" id="profileXpText">0 / 500 to next level</div></div>
+          <div class="statBox"><div class="statLabel">Level</div><div class="statValue" id="profileLevel">1</div></div>
+          <div class="statBox"><div class="statLabel">🔥 Streak</div><div class="statValue" id="profileStreak">0</div></div>
+          <div class="statBox"><div class="statLabel">Best Streak</div><div class="statValue" id="profileBestStreak">0</div></div>
+        </div>
+        <div class="profileSections">
+          <div class="leaderTable"><h4>🎯 Daily Challenges</h4><div id="dailyChallenges" class="challengeList"><div class="leaderEmpty">Loading today’s challenges…</div></div></div>
+          <div class="leaderTable"><h4>🏅 Badges</h4><div id="badgeList" class="badgeGrid"></div><div class="challengeMeta">Earn badges by playing and hitting milestones.</div></div>
+        </div>
       </div>
 
       <div class="onlinePanel">
