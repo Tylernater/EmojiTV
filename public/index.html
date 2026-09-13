@@ -1,3559 +1,449 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>EmojiTV</title>
-
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EmojiTV — Play Face-Off, Video Chat & Hunt</title>
 <style>
-*{
-  box-sizing:border-box;
-}
-
-html,body{
-  margin:0;
-  padding:0;
-  min-height:100%;
-  font-family:Arial,Helvetica,sans-serif;
-  background:#111827;
-  color:white;
-}
-
-body{
-  min-height:100vh;
-}
-
-button,
-input{
-  font:inherit;
-}
-
-button{
-  cursor:pointer;
-}
-
-.hidden{
-  display:none !important;
-}
-
-.screen{
-  min-height:100vh;
-}
-
-.container{
-  width:min(1150px,94%);
-  margin:0 auto;
-}
-
-/* ======================================================
-   HOME
-====================================================== */
-
-#home{
-  padding:25px 0 45px;
-}
-
-.topbar{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:15px;
-  margin-bottom:25px;
-}
-
-.logo{
-  font-size:30px;
-  font-weight:900;
-  letter-spacing:-1px;
-}
-
-.online{
-  font-size:14px;
-  opacity:.8;
-}
-
-.usernameBox{
-  display:flex;
-  gap:8px;
-  align-items:center;
-}
-
-.usernameBox input{
-  width:150px;
-  padding:10px 12px;
-  border:1px solid #374151;
-  border-radius:10px;
-  background:#1f2937;
-  color:white;
-  outline:none;
-}
-
-.primary{
-  border:0;
-  border-radius:12px;
-  padding:11px 17px;
-  font-weight:800;
-  background:#7c3aed;
-  color:white;
-}
-
-.primary:hover{
-  filter:brightness(1.12);
-}
-
-.secondary{
-  border:1px solid #374151;
-  border-radius:12px;
-  padding:10px 15px;
-  font-weight:700;
-  background:#1f2937;
-  color:white;
-}
-
-.secondary:hover{
-  background:#273449;
-}
-
-.tools{
-  display:flex;
-  justify-content:flex-end;
-  gap:8px;
-  flex-wrap:wrap;
-  margin-bottom:10px;
-}
-
-.hiddenPanel{
-  display:none;
-}
-
-.hiddenPanel.show{
-  display:block;
-}
-
-.panel{
-  background:#1b2433;
-  border:1px solid #334155;
-  border-radius:18px;
-  padding:20px;
-  margin:15px 0 25px;
-}
-
-.panel h2{
-  margin-top:0;
-}
-
-.leaderGrid{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:10px;
-}
-
-.leaderItem{
-  background:#111827;
-  border-radius:12px;
-  padding:12px;
-  border:1px solid #273449;
-}
-
-.leaderItem strong{
-  display:block;
-  margin-bottom:5px;
-}
-
-.emoji{
-  font-size:55px;
-  text-align:center;
-  margin-top:10px;
-}
-
-h1{
-  text-align:center;
-  font-size:42px;
-  margin:5px 0 8px;
-}
-
-.subtitle{
-  text-align:center;
-  max-width:700px;
-  margin:0 auto 28px;
-  color:#cbd5e1;
-  line-height:1.5;
-}
-
-.modeGrid{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:16px;
-}
-
-.modeCard{
-  background:#1b2433;
-  border:1px solid #334155;
-  border-radius:20px;
-  padding:23px;
-  transition:.15s;
-}
-
-.modeCard:hover{
-  transform:translateY(-3px);
-  border-color:#7c3aed;
-}
-
-.modeIcon{
-  font-size:43px;
-  margin-bottom:10px;
-}
-
-.modeCard h3{
-  margin:0 0 8px;
-  font-size:22px;
-}
-
-.modeCard p{
-  color:#aeb9ca;
-  min-height:48px;
-  line-height:1.4;
-}
-
-.modeCard button{
-  width:100%;
-  margin-top:8px;
-}
-
-.progressPanel{
-  margin-top:25px;
-}
-
-.progressStats{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:10px;
-}
-
-.stat{
-  background:#111827;
-  border:1px solid #273449;
-  border-radius:14px;
-  padding:15px;
-}
-
-.stat small{
-  display:block;
-  color:#94a3b8;
-  margin-bottom:5px;
-}
-
-.challengeGrid,
-.badgeGrid{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:10px;
-  margin-top:15px;
-}
-
-.challenge,
-.badge{
-  padding:13px;
-  background:#111827;
-  border:1px solid #273449;
-  border-radius:12px;
-}
-
-.friendsSection{
-  margin-top:25px;
-}
-
-.friendAdd{
-  display:flex;
-  gap:8px;
-  margin-top:12px;
-}
-
-.friendAdd input{
-  flex:1;
-  padding:12px;
-  background:#111827;
-  color:white;
-  border:1px solid #374151;
-  border-radius:10px;
-}
-
-.friendList{
-  margin-top:15px;
-  display:grid;
-  gap:8px;
-}
-
-.friendRow{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  padding:12px;
-  background:#111827;
-  border:1px solid #273449;
-  border-radius:12px;
-}
-
-footer{
-  text-align:center;
-  margin-top:35px;
-  color:#64748b;
-  font-size:13px;
-}
-
-/* ======================================================
-   GAME
-====================================================== */
-
-#game{
-  padding:20px 0 40px;
-}
-
-.gameTop{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:15px;
-  margin-bottom:15px;
-}
-
-.gameTitle{
-  font-size:25px;
-  font-weight:900;
-}
-
-.status{
-  color:#aeb9ca;
-  font-size:14px;
-}
-
-.videoGrid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:15px;
-}
-
-.videoBox{
-  position:relative;
-  background:#020617;
-  border:1px solid #334155;
-  border-radius:18px;
-  overflow:hidden;
-  min-height:340px;
-}
-
-.videoBox video{
-  width:100%;
-  height:100%;
-  min-height:340px;
-  object-fit:cover;
-  display:block;
-  background:#020617;
-}
-
-.videoLabel{
-  position:absolute;
-  left:12px;
-  top:12px;
-  background:rgba(0,0,0,.65);
-  padding:8px 11px;
-  border-radius:9px;
-  font-weight:800;
-  z-index:3;
-}
-
-.videoPlaceholder{
-  position:absolute;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  text-align:center;
-  padding:30px;
-  color:#94a3b8;
-  font-size:18px;
-  z-index:1;
-  pointer-events:none;
-}
-
-.gameInfo{
-  margin-top:15px;
-  background:#1b2433;
-  border:1px solid #334155;
-  border-radius:18px;
-  padding:20px;
-  text-align:center;
-}
-
-.targetEmoji{
-  font-size:85px;
-  line-height:1;
-  margin:8px 0;
-}
-
-.countdown{
-  font-size:65px;
-  font-weight:900;
-  margin:10px 0;
-}
-
-.matchText{
-  font-size:25px;
-  font-weight:900;
-}
-
-.scoreRow{
-  display:flex;
-  justify-content:center;
-  gap:30px;
-  margin-top:15px;
-  font-size:18px;
-}
-
-.bigScore{
-  font-size:35px;
-  font-weight:900;
-}
-
-.gameButtons{
-  display:flex;
-  justify-content:center;
-  gap:10px;
-  flex-wrap:wrap;
-  margin-top:18px;
-}
-
-.chatArea{
-  max-height:250px;
-  overflow-y:auto;
-  background:#020617;
-  border:1px solid #334155;
-  border-radius:12px;
-  padding:12px;
-  text-align:left;
-}
-
-.chatMessage{
-  padding:7px 0;
-}
-
-.chatName{
-  font-weight:900;
-}
-
-.chatInput{
-  display:flex;
-  gap:8px;
-  margin-top:10px;
-}
-
-.chatInput input{
-  flex:1;
-  padding:12px;
-  border-radius:10px;
-  border:1px solid #374151;
-  background:#111827;
-  color:white;
-}
-
-.connectionNotice{
-  margin-top:12px;
-  padding:11px;
-  border-radius:10px;
-  background:#3f2d11;
-  color:#fbbf24;
-}
-
-.successNotice{
-  background:#12331f;
-  color:#86efac;
-}
-
-/* ======================================================
-   MOBILE
-====================================================== */
-
-@media(max-width:800px){
-  .topbar{
-    flex-direction:column;
-    align-items:stretch;
-  }
-
-  .usernameBox{
-    width:100%;
-  }
-
-  .usernameBox input{
-    flex:1;
-    width:auto;
-  }
-
-  .modeGrid{
-    grid-template-columns:1fr;
-  }
-
-  .leaderGrid{
-    grid-template-columns:1fr;
-  }
-
-  .progressStats{
-    grid-template-columns:1fr 1fr;
-  }
-
-  .challengeGrid,
-  .badgeGrid{
-    grid-template-columns:1fr;
-  }
-
-  .videoGrid{
-    grid-template-columns:1fr;
-  }
-
-  .videoBox,
-  .videoBox video{
-    min-height:260px;
-  }
-
-  h1{
-    font-size:34px;
-  }
-}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:radial-gradient(circle at top,#182342 0,#080b16 48%);color:#fff;min-height:100vh}button,input{font:inherit}button{border:0;cursor:pointer}.app{max-width:1180px;margin:auto;padding:28px 22px 20px;min-height:100vh;display:flex;flex-direction:column}header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.brand{font-size:25px;font-weight:950;letter-spacing:-.5px}.pill{padding:8px 12px;border-radius:999px;background:#151a2b;color:#b9c4df;font-size:13px}.screen{display:none}.screen.active{display:block}.hero{text-align:center;padding:22px 8px 10px}.hero h1{font-size:clamp(38px,6vw,64px);margin:0 0 8px;letter-spacing:-1.8px}.hero p{color:#aeb7ce;font-size:16px;line-height:1.5;max-width:650px;margin:0 auto 22px}.dashboard{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:20px 0 0}.mode{background:linear-gradient(180deg,#151d33,#0f1423);border:1px solid #2a3858;border-radius:20px;padding:22px;text-align:left;box-shadow:0 16px 42px #0004;min-height:285px;display:flex;flex-direction:column}.mode .modeEmoji{font-size:52px;line-height:1}.mode h2{margin:13px 0 7px;font-size:22px;letter-spacing:-.3px}.mode p{color:#9faac2;min-height:72px;line-height:1.5;margin:0 0 8px}.primary,.mode button{background:#fff;color:#080b16;padding:13px 18px;border-radius:12px;font-weight:900;transition:transform .15s,box-shadow .15s}.primary:hover,.mode button:hover{transform:translateY(-1px);box-shadow:0 8px 20px #0005}.mode button{width:100%;margin-top:auto}.secondary{background:#151b2d;color:#fff;padding:10px 15px;border-radius:11px;border:1px solid #263352;font-weight:800;transition:transform .15s,background .15s}.secondary:hover{background:#1b243b;transform:translateY(-1px)}.danger{background:#3a1821}.card{background:#101525dd;border:1px solid #202a43;border-radius:22px;padding:20px;box-shadow:0 18px 55px #0003}.status{text-align:center;margin:8px 0 18px;color:#aeb7ce}.videos{display:grid;grid-template-columns:1fr 1fr;gap:16px}.videoCard{position:relative;background:#05070c;border-radius:18px;overflow:hidden;min-height:300px;border:1px solid #202a43}.videoCard video{width:100%;height:100%;min-height:300px;display:block;object-fit:cover;transform:scaleX(-1);background:#05070c}.videoCard.opponent video{transform:none}.label{position:absolute;top:12px;left:12px;background:#000b;padding:7px 10px;border-radius:10px;font-size:13px;z-index:2}.emoji{text-align:center;font-size:108px;margin:5px}.round{text-align:center;color:#aeb7ce;margin-bottom:3px}.countdown{font-size:27px;font-weight:950;text-align:center;margin:8px}.scorebar{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:8px 0 12px}.score{background:#101525;border:1px solid #202a43;border-radius:12px;padding:8px 14px;color:#dce4f7}.live-score{font-weight:950;color:#fff}.controls{display:flex;justify-content:center;gap:10px;margin-top:16px;flex-wrap:wrap}.notice{display:none;padding:14px;border-radius:14px;background:#2b1620;color:#ffd4df;margin:12px 0}.notice.show{display:block}.tiny{font-size:13px;color:#8994ad;text-align:center;margin-top:13px}.spinner{font-size:48px;text-align:center;animation:spin 1.2s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.result{text-align:center;font-size:24px;font-weight:950;margin:12px;min-height:29px}.face-status,.hunt-status{text-align:center;color:#a9b4cc;font-size:13px;min-height:20px}.chatBox{margin-top:16px}.messages{height:150px;overflow:auto;background:#090d18;border:1px solid #202a43;border-radius:14px;padding:12px}.msg{margin:6px 0;color:#dfe6f8}.msg.self{text-align:right}.chatRow{display:flex;gap:8px;margin-top:8px}.chatRow input{flex:1;background:#0b1020;color:white;border:1px solid #263352;border-radius:12px;padding:12px}.huntTarget{display:flex;align-items:center;justify-content:center;gap:14px;margin:4px 0 12px}.huntTarget .emoji{margin:0;font-size:90px}.huntTarget .targetName{font-size:25px;font-weight:950}.huntPanel{background:#0c1220;border:1px solid #202a43;border-radius:16px;padding:14px;text-align:center}.progress{height:11px;background:#202a43;border-radius:999px;overflow:hidden;margin:10px 0}.progress>div{height:100%;width:0;background:#fff;transition:width .2s}.cameraHint{color:#9faac2;font-size:13px}.footer{text-align:center;color:#68738d;font-size:13px;margin-top:auto;padding-top:25px}.made-with-heart{display:inline-block;margin-top:5px;font-size:12px;color:#8b94aa}.back{margin-bottom:12px}@media(max-width:850px){.dashboard{grid-template-columns:1fr}.videos{grid-template-columns:1fr}.videoCard,.videoCard video{min-height:235px}.hero{padding-top:15px}}
+.reportBtn{background:#3a1821!important;color:#ffd9e2!important;border:1px solid #6a2a3a!important}.reportModal{position:fixed;inset:0;background:#050812dd;backdrop-filter:blur(9px);display:none;align-items:center;justify-content:center;padding:18px;z-index:100}.reportModal.show{display:flex}.reportCard{width:min(560px,100%);background:#11182a;border:1px solid #33415f;border-radius:22px;padding:22px;box-shadow:0 25px 90px #0009}.reportCard h2{margin:0 0 7px}.reportCard p{color:#aeb7ce;line-height:1.45}.reportCard select,.reportCard textarea{width:100%;background:#080d19;color:#fff;border:1px solid #2b3958;border-radius:12px;padding:12px;margin:7px 0 12px}.reportCard textarea{min-height:110px;resize:vertical}.reportMeta{font-size:12px;color:#8994ad;background:#0b101d;border-radius:12px;padding:10px;margin-bottom:12px}.reportActions{display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap}.reportSuccess{display:none;background:#102a1d;color:#c9ffe0;padding:12px;border-radius:12px;margin:10px 0}.reportSuccess.show{display:block}</style><style>
+#nameGate{position:fixed;inset:0;background:#070a13ee;backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50}#nameGate.hidden{display:none}.nameCard{width:min(480px,100%);background:#11182a;border:1px solid #2a3858;border-radius:24px;padding:28px;box-shadow:0 25px 80px #0008;text-align:center}.nameCard h2{font-size:32px;margin:0 0 8px}.nameCard p{color:#aeb7ce;line-height:1.5}.nameCard input{width:100%;background:#080d19;color:#fff;border:1px solid #2b3958;border-radius:13px;padding:14px 15px;outline:none;margin:10px 0}.nameCard button{width:100%;margin-top:6px}.dashboardTop{display:block;margin-bottom:6px}.dashboardMain{display:block}.dashboardShare{position:fixed;left:20px;bottom:20px;z-index:20;display:none}.dashboardShare button{box-shadow:0 10px 30px #0006}.dashboardTools{display:flex;justify-content:center;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 22px}.dashboardTools .pill{padding:9px 13px}.onlinePanel,.leaderPanel{background:#101525dd;border:1px solid #202a43;border-radius:18px;padding:17px;margin-top:16px;text-align:left}.onlineHead,.leaderHead{display:flex;justify-content:space-between;align-items:center;gap:10px}.onlineHead h3,.leaderHead h3{margin:0}.onlineNames{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.onlineName{background:#151d31;border:1px solid #283655;border-radius:999px;padding:6px 9px;font-size:12px;color:#dfe6f8}.leaderboards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}.leaderTable{background:#0b101d;border:1px solid #202a43;border-radius:14px;padding:12px}.leaderTable h4{margin:0 0 8px}.leaderRow{display:grid;grid-template-columns:28px 1fr auto;gap:8px;padding:7px 0;border-bottom:1px solid #182238;font-size:13px}.leaderRow:last-child{border-bottom:0}.leaderEmpty{color:#7f8aa3;font-size:13px}.friendRow{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#0b101d;border:1px solid #202a43;border-radius:12px;padding:9px;margin:7px 0}.friendRowName{font-weight:800}.friendActions{display:flex;gap:5px;flex-wrap:wrap}.friendActions button{padding:7px 9px;font-size:11px}.inviteBox{background:#0b101d;border:1px solid #202a43;border-radius:14px;padding:12px;margin:10px 0}.inviteActions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.usernameBadge{color:#dfe6f8;font-weight:800}.friendSearchHome{margin:20px 0 0;text-align:left;padding:18px}.dashboardTop .onlinePanel{margin-top:16px}.dashboardTop .leaderPanel{margin-top:16px}.friendSearchHome input{flex:1;background:#0b1020;color:#fff;border:1px solid #263352;border-radius:11px;padding:12px 13px;min-width:0;outline:none}.friendSearchHome input:focus{border-color:#536a99;box-shadow:0 0 0 3px #536a9925}.profilePanel{background:#101525dd;border:1px solid #202a43;border-radius:18px;padding:17px;margin-top:16px;text-align:left}.profileGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}.statBox{background:#0b101d;border:1px solid #202a43;border-radius:14px;padding:12px}.statBox .statLabel{font-size:11px;color:#8994ad;text-transform:uppercase;letter-spacing:.5px}.statBox .statValue{font-size:22px;font-weight:950;margin-top:3px}.xpTrack{height:9px;background:#202a43;border-radius:999px;overflow:hidden;margin-top:10px}.xpTrack>div{height:100%;width:0;background:#fff;transition:width .3s}.profileSections{display:grid;grid-template-columns:1.15fr .85fr;gap:12px;margin-top:12px}.challengeList,.badgeList{display:grid;gap:8px}.challengeRow,.badgeRow{background:#0b101d;border:1px solid #202a43;border-radius:12px;padding:10px}.challengeTop,.badgeTop{display:flex;justify-content:space-between;gap:8px;align-items:center}.challengeTitle,.badgeTitle{font-weight:850}.challengeMeta,.badgeMeta{font-size:11px;color:#8994ad;margin-top:4px}.badgeGrid{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}.badgeChip{background:#151d31;border:1px solid #283655;border-radius:999px;padding:7px 9px;font-size:12px}.badgeChip.locked{opacity:.38}.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:#11182a;border:1px solid #33415f;color:#fff;padding:12px 16px;border-radius:13px;box-shadow:0 18px 50px #0008;z-index:120;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}.toast.show{opacity:1;transform:translate(-50%,0)}.hiddenPanel{display:none}.hiddenPanel.show{display:block}@media(max-width:850px){.leaderboards{grid-template-columns:1fr}.profileGrid{grid-template-columns:repeat(2,1fr)}.profileSections{grid-template-columns:1fr}.dashboard{grid-template-columns:1fr}.mode{min-height:0}.dashboardShare{display:block;left:14px;bottom:14px}.dashboardTools{gap:7px}.dashboardTools button{padding:9px 12px}.friendSearchHome .chatRow{flex-direction:column}.friendSearchHome .chatRow button{width:100%}}
 </style>
 </head>
-
 <body>
-
-<div id="home" class="screen">
-  <div class="container">
-
-    <div class="topbar">
-      <div>
-        <div class="logo">🎭 EmojiTV</div>
-        <div class="online" id="onlineText">
-          Connecting...
-        </div>
-      </div>
-
-      <div class="usernameBox">
-        <input
-          id="usernameInput"
-          maxlength="20"
-          placeholder="Username"
-        >
-        <button
-          class="primary"
-          id="saveUsernameBtn"
-        >
-          Save
-        </button>
-      </div>
-    </div>
-
-    <div class="tools">
-      <button
-        class="secondary"
-        id="leaderBtn"
-      >
-        🏆 Leaderboard
-      </button>
-
-      <button
-        class="secondary"
-        id="friendsBtn"
-      >
-        👥 Friends
-      </button>
-    </div>
-
-    <!-- LEADERBOARD -->
-    <div
-      id="leaderPanel"
-      class="hiddenPanel panel"
-    >
-      <h2>🏆 Leaderboard</h2>
-
-      <div
-        id="leaderList"
-        class="leaderGrid"
-      >
-        Loading...
-      </div>
-    </div>
-
-    <div class="emoji">🎮</div>
-
-    <h1>Choose Your Game</h1>
-
-    <p class="subtitle">
-      Match with a random person online and play together.
-      You do NOT need to be friends with them.
-    </p>
-
-    <div class="modeGrid">
-
-      <!-- FACE -->
-      <div class="modeCard">
-        <div class="modeIcon">😎</div>
-
-        <h3>Face-Off</h3>
-
-        <p>
-          A random opponent gets matched with you.
-          Match the emoji using your face.
-        </p>
-
-        <button
-          class="primary"
-          data-mode="face"
-        >
-          Play Face-Off
-        </button>
-      </div>
-
-      <!-- CHAT -->
-      <div class="modeCard">
-        <div class="modeIcon">💬</div>
-
-        <h3>Video Chat</h3>
-
-        <p>
-          Get connected with a random person.
-          See and talk to each other.
-        </p>
-
-        <button
-          class="primary"
-          data-mode="chat"
-        >
-          Start Video Chat
-        </button>
-      </div>
-
-      <!-- HUNT -->
-      <div class="modeCard">
-        <div class="modeIcon">🔎</div>
-
-        <h3>Emoji Hunt</h3>
-
-        <p>
-          Find the requested object with your camera
-          before your random opponent.
-        </p>
-
-        <button
-          class="primary"
-          data-mode="hunt"
-        >
-          Play Emoji Hunt
-        </button>
-      </div>
-
-      <!-- POSE -->
-      <div class="modeCard">
-        <div class="modeIcon">🕺</div>
-
-        <h3>Pose Battle</h3>
-
-        <p>
-          Get a random pose and compete against
-          another random player.
-        </p>
-
-        <button
-          class="primary"
-          data-mode="pose"
-        >
-          Play Pose Battle
-        </button>
-      </div>
-
-      <!-- LAUGH -->
-      <div class="modeCard">
-        <div class="modeIcon">😂</div>
-
-        <h3>Laugh Battle</h3>
-
-        <p>
-          Try to make your random opponent laugh
-          while staying focused.
-        </p>
-
-        <button
-          class="primary"
-          data-mode="laugh"
-        >
-          Play Laugh Battle
-        </button>
-      </div>
-
-      <!-- RANDOM -->
-      <div class="modeCard">
-        <div class="modeIcon">🎲</div>
-
-        <h3>Random Match</h3>
-
-        <p>
-          Jump into a random game and meet
-          another player.
-        </p>
-
-        <button
-          class="primary"
-          data-mode="face"
-        >
-          Random Match
-        </button>
-      </div>
-
-    </div>
-
-    <!-- PROGRESS -->
-    <div class="panel progressPanel">
-
-      <h2>👤 Your Progress</h2>
-
-      <div class="progressStats">
-
-        <div class="stat">
-          <small>Level</small>
-          <strong id="levelStat">1</strong>
-        </div>
-
-        <div class="stat">
-          <small>XP</small>
-          <strong id="xpStat">0</strong>
-        </div>
-
-        <div class="stat">
-          <small>Games</small>
-          <strong id="gamesStat">0</strong>
-        </div>
-
-        <div class="stat">
-          <small>Wins</small>
-          <strong id="winsStat">0</strong>
-        </div>
-
-      </div>
-
-      <p id="nextLevelText">
-        0 / 500 to next level
-      </p>
-
-      <div class="progressStats">
-
-        <div class="stat">
-          <small>Level</small>
-          <strong id="levelStat2">1</strong>
-        </div>
-
-        <div class="stat">
-          <small>🔥 Streak</small>
-          <strong id="streakStat">0</strong>
-        </div>
-
-        <div class="stat">
-          <small>Best Streak</small>
-          <strong id="bestStreakStat">0</strong>
-        </div>
-
-        <div class="stat">
-          <small>Losses</small>
-          <strong id="lossesStat">0</strong>
-        </div>
-
-      </div>
-
-      <h3>🎯 Daily Challenges</h3>
-
-      <div
-        id="challengeList"
-        class="challengeGrid"
-      ></div>
-
-      <h3>🏅 Badges</h3>
-
-      <div
-        id="badgeList"
-        class="badgeGrid"
-      ></div>
-
-    </div>
-
-    <!-- FRIENDS -->
-    <div class="panel friendsSection">
-
-      <h2>👥 Add a friend</h2>
-
-      <p>
-        Friends are optional. You do NOT need to be friends
-        with someone to play a random game.
-      </p>
-
-      <div class="friendAdd">
-        <input
-          id="friendInput"
-          maxlength="20"
-          placeholder="Enter username"
-        >
-
-        <button
-          class="primary"
-          id="addFriendBtn"
-        >
-          Add Friend
-        </button>
-      </div>
-
-      <div
-        id="friendList"
-        class="friendList"
-      ></div>
-
-    </div>
-
-    <footer>
-      Made by Tyler L.
-    </footer>
-
+<div id="toast" class="toast"></div>
+<div id="nameGate">
+  <div class="nameCard">
+    <h2>👋 Welcome to EmojiTV</h2>
+    <p>Choose a username. It will be saved on this device and used for matchmaking, the online list, and leaderboards.</p>
+    <input id="usernameInput" maxlength="20" autocomplete="nickname" placeholder="Enter your username">
+    <button class="primary" id="saveUsername">SAVE & PLAY</button>
+    <div class="tiny">Use a nickname — don't enter private information.</div>
   </div>
 </div>
+<div id="reportModal" class="reportModal" aria-hidden="true"><div class="reportCard"><h2>🚩 Report a player</h2><p>If something inappropriate or unsafe happens, report it here. Your report includes the game mode, usernames, time, and connection ID so it can be reviewed.</p><div class="reportMeta" id="reportMeta">Connected player: —</div><label for="reportReason"><strong>What happened?</strong></label><select id="reportReason"><option value="harassment">Harassment or bullying</option><option value="sexual-content">Sexual or inappropriate content</option><option value="hate">Hateful or discriminatory behavior</option><option value="threats">Threats or dangerous behavior</option><option value="spam">Spam, scams, or advertising</option><option value="privacy">Sharing personal information</option><option value="other">Something else</option></select><label for="reportDetails"><strong>Details (optional)</strong></label><textarea id="reportDetails" maxlength="1000" placeholder="Briefly explain what happened..."></textarea><div id="reportSuccess" class="reportSuccess"></div><div class="reportActions"><button class="secondary" id="reportCancel">CANCEL</button><button class="secondary reportBtn" id="reportSubmit">SUBMIT REPORT</button></div><div class="tiny">For immediate safety concerns, leave the match and tell a trusted adult. EmojiTV does not record or save your camera/video as part of a report.</div></div></div><div id="friendsModal" class="reportModal" aria-hidden="true"><div class="reportCard"><h2>👥 Friends & Messages</h2><p>Add online players as friends, see when they are online, message them, and invite them to a game mode.</p><div class="reportMeta" id="friendNotice">Choose a friend to message or invite.</div><div id="gameInvites"></div><div id="friendRequests" style="margin:10px 0"></div><div id="friendsList"></div><div id="dmArea" style="display:none;margin-top:14px"><div class="reportMeta">Chatting with <strong id="dmWith">—</strong></div><div class="messages" id="dmMessages" style="height:220px"></div><div class="chatRow"><input id="dmInput" maxlength="300" placeholder="Message your friend..."><button class="secondary" id="dmSend">SEND</button></div></div><div class="reportActions" style="margin-top:14px"><button class="secondary" id="friendsClose">CLOSE</button></div></div></div><div class="app">
+<header><div class="brand">🎭 EmojiTV</div><div class="pill" id="connection">Not connected</div></header>
+
+<section id="home" class="screen active">
+  <div class="hero">
+    <div class="dashboardTop">
+      <div class="dashboardTools">
+        <div class="pill">👤 <span class="usernameBadge" id="currentUsername">Guest</span></div>
+        <div class="pill">🟢 <span id="onlineCount">0</span> online</div>
+        <button class="secondary" id="changeUsername">CHANGE NAME</button>
+        <button class="secondary" id="leaderboardToggle">🏆 LEADERBOARDS</button>
+        <button class="secondary" id="friendsToggle">👥 FRIENDS</button>
+      </div>
 
 
-<!-- =====================================================
-     GAME SCREEN
-===================================================== -->
-
-<div
-  id="game"
-  class="screen hidden"
->
-  <div class="container">
-
-    <div class="gameTop">
-
-      <div>
-        <div
-          class="gameTitle"
-          id="gameModeTitle"
-        >
-          EmojiTV
-        </div>
-
-        <div
-          class="status"
-          id="gameStatus"
-        >
-          Connecting...
+      <div id="leaderPanel" class="leaderPanel hiddenPanel">
+        <div class="leaderHead"><h3>🏆 Leaderboards</h3><span class="tiny">Top 20</span></div>
+        <div class="leaderboards">
+          <div class="leaderTable"><h4>😀 Emoji Face-Off</h4><div id="faceLeaderboard"><div class="leaderEmpty">No completed games yet.</div></div></div>
+          <div class="leaderTable"><h4>🧻 Emoji Hunt</h4><div id="huntLeaderboard"><div class="leaderEmpty">No completed games yet.</div></div></div>
+          <div class="leaderTable"><h4>📹 Video Chat</h4><div id="chatLeaderboard"><div class="leaderEmpty">No chat sessions yet.</div></div></div>
+          <div class="leaderTable"><h4>⭐ XP</h4><div id="xpLeaderboard"><div class="leaderEmpty">No XP earned yet.</div></div></div>
         </div>
       </div>
 
-      <button
-        class="secondary"
-        id="leaveBtn"
-      >
-        Leave
-      </button>
+      <div class="emoji">🎮</div>
 
-    </div>
+      <h1>Choose Your Game</h1>
+      <p>Play against a random person with your camera. Pick a mode and jump in.</p>
 
-    <div class="videoGrid">
+      <div class="dashboard">
+        <div class="mode"><div class="modeEmoji">😀</div><h2>Emoji Face-Off</h2><p>Copy the emoji with your face. AI face landmarks score how closely you match it.</p><button data-mode="face">PLAY FACE-OFF</button></div>
+        <div class="mode"><div class="modeEmoji">📹</div><h2>Video Chat</h2><p>A simple random video chat mode. No emoji and no scoring — just talk.</p><button data-mode="chat">START VIDEO CHAT</button></div>
+        <div class="mode"><div class="modeEmoji">🧻</div><h2>Emoji Hunt</h2><p>Find the real-world item shown by the emoji. AI checks your camera and awards the point.</p><button data-mode="hunt">START EMOJI HUNT</button></div>
+      </div>
 
-      <!-- MY VIDEO -->
-      <div class="videoBox">
-
-        <div class="videoLabel">
-          You
+      <div class="profilePanel">
+        <div class="leaderHead"><h3>👤 Your Progress</h3><span class="tiny" id="profileLevelLabel">Level 1</span></div>
+        <div class="profileGrid">
+          <div class="statBox"><div class="statLabel">XP</div><div class="statValue" id="profileXp">0</div><div class="xpTrack"><div id="profileXpBar"></div></div><div class="challengeMeta" id="profileXpText">0 / 500 to next level</div></div>
+          <div class="statBox"><div class="statLabel">Level</div><div class="statValue" id="profileLevel">1</div></div>
+          <div class="statBox"><div class="statLabel">🔥 Streak</div><div class="statValue" id="profileStreak">0</div></div>
+          <div class="statBox"><div class="statLabel">Best Streak</div><div class="statValue" id="profileBestStreak">0</div></div>
         </div>
-
-        <video
-          id="localVideo"
-          autoplay
-          muted
-          playsinline
-        ></video>
-
-        <div
-          id="localPlaceholder"
-          class="videoPlaceholder"
-        >
-          Camera loading...
+        <div class="profileSections">
+          <div class="leaderTable"><h4>🎯 Daily Challenges</h4><div id="dailyChallenges" class="challengeList"><div class="leaderEmpty">Loading today’s challenges…</div></div></div>
+          <div class="leaderTable"><h4>🏅 Badges</h4><div id="badgeList" class="badgeGrid"></div><div class="challengeMeta">Earn badges by playing and hitting milestones.</div></div>
         </div>
-
       </div>
 
-      <!-- REMOTE VIDEO -->
-      <div class="videoBox">
-
-        <div class="videoLabel">
-          <span id="opponentName">
-            Random Opponent
-          </span>
-        </div>
-
-        <video
-          id="remoteFace"
-          autoplay
-          playsinline
-        ></video>
-
-        <video
-          id="remoteChat"
-          autoplay
-          playsinline
-          class="hidden"
-        ></video>
-
-        <video
-          id="remoteHunt"
-          autoplay
-          playsinline
-          class="hidden"
-        ></video>
-
-        <video
-          id="remoteWaiting"
-          autoplay
-          playsinline
-          class="hidden"
-        ></video>
-
-        <video
-          id="remotePose"
-          autoplay
-          playsinline
-          class="hidden"
-        ></video>
-
-        <video
-          id="remoteLaugh"
-          autoplay
-          playsinline
-          class="hidden"
-        ></video>
-
-        <div
-          id="remotePlaceholder"
-          class="videoPlaceholder"
-        >
-          Waiting for your random opponent...
-        </div>
-
+      <div class="onlinePanel">
+        <div class="onlineHead"><h3>🟢 Players Online</h3><span class="pill" id="onlineCountLarge">0</span></div>
+        <div class="onlineNames" id="onlineNames"><span class="onlineName">Connecting…</span></div>
       </div>
 
-    </div>
 
-    <div
-      id="connectionNotice"
-      class="connectionNotice hidden"
-    >
-      Your opponent temporarily disconnected.
-      Waiting for them to reconnect...
-    </div>
-
-    <!-- GAME INFORMATION -->
-
-    <div class="gameInfo">
-
-      <div
-        id="matchText"
-        class="matchText"
-      >
-        MATCHING...
+      <div class="friendSearchHome card">
+        <div style="font-weight:900;font-size:18px">👥 Add a friend</div>
+        <div style="color:#9faac2;font-size:13px;margin:5px 0 10px">Search for their username while they are online.</div>
+        <div class="chatRow"><input id="friendSearchInput" maxlength="20" placeholder="Search username"><button class="primary" id="friendSearchButton">ADD FRIEND</button></div>
+        <div id="friendSearchResult" class="tiny"></div>
       </div>
+      <div class="dashboardShare"><button class="secondary" id="dashboardShare">📤 SHARE</button></div>
+      <div class="tiny" style="margin-top:18px">Random matchmaking • Camera & microphone required</div>
+    </div>  </div>
+</section>
 
-      <div
-        id="targetEmoji"
-        class="targetEmoji"
-      >
-        🎭
-      </div>
-
-      <div
-        id="countdown"
-        class="countdown"
-      ></div>
-
-      <div
-        id="gameInstruction"
-      >
-        Waiting for a random player...
-      </div>
-
-      <div class="scoreRow">
-
-        <div>
-          <div>You</div>
-          <div
-            id="myScore"
-            class="bigScore"
-          >
-            0
-          </div>
-        </div>
-
-        <div>
-          <div>Opponent</div>
-          <div
-            id="opponentScore"
-            class="bigScore"
-          >
-            0
-          </div>
-        </div>
-
-      </div>
-
-      <div class="gameButtons">
-
-        <button
-          class="secondary"
-          id="skipBtn"
-        >
-          ⏭ Skip
-        </button>
-
-        <button
-          class="secondary"
-          id="addOpponentBtn"
-        >
-          👥 Add Friend
-        </button>
-
-      </div>
-
-    </div>
-
-    <!-- CHAT -->
-
-    <div
-      id="chatBox"
-      class="gameInfo hidden"
-    >
-
-      <h3>💬 Video Chat</h3>
-
-      <div
-        id="chatMessages"
-        class="chatArea"
-      ></div>
-
-      <div class="chatInput">
-
-        <input
-          id="chatInput"
-          maxlength="300"
-          placeholder="Type a message..."
-        >
-
-        <button
-          class="primary"
-          id="sendChatBtn"
-        >
-          Send
-        </button>
-
-      </div>
-
-    </div>
-
+<section id="match" class="screen">
+  <button class="secondary back" id="matchBack">← Dashboard</button>
+  <div class="card">
+    <div class="spinner">⏳</div><h2 style="text-align:center" id="matchTitle">Finding an opponent...</h2>
+    <p class="status" id="matchStatus">Starting camera...</p>
+    <div class="videos"><div class="videoCard"><span class="label">YOU</span><video id="localWaiting" autoplay muted playsinline></video></div><div class="videoCard opponent"><span class="label" id="remoteWaitingLabel">PLAYER</span><video id="remoteWaiting" autoplay playsinline></video></div></div>
+    <div id="error" class="notice"></div>
+    <div class="controls"><button class="secondary" id="cancel">CANCEL</button><button class="secondary" id="retry" style="display:none">RETRY</button></div>
   </div>
-</div>
+</section>
 
+<section id="faceGame" class="screen">
+  <button class="secondary back" id="faceBack">← Dashboard</button>
+  <div class="round" id="faceRoundText">Round 1 of 5</div><div class="emoji" id="faceTarget">😎</div><div class="countdown" id="faceCountdown">GET READY!</div>
+  <div class="scorebar"><div class="score">Your score: <span class="live-score" id="faceYourScore">0</span></div><div class="score"><span id="faceOpponentName">PLAYER</span>: <span class="live-score" id="faceOpponentScore">0</span></div></div>
+  <div class="videos"><div class="videoCard"><span class="label">YOU</span><video id="localFace" autoplay muted playsinline></video></div><div class="videoCard opponent"><span class="label" id="remoteFaceLabel">PLAYER</span><video id="remoteFace" autoplay playsinline></video></div></div>
+  <div class="face-status" id="faceStatus">Loading face scoring…</div><div class="result" id="faceResult"></div>
+  <div class="controls"><button class="secondary" id="faceFriend">👥 ADD FRIEND</button><button class="secondary reportBtn" id="faceReport">🚩 REPORT</button><button class="secondary" id="facePlayAgain" style="display:none">🔁 PLAY AGAIN WITH THEM</button><button class="secondary" id="faceSkip">SKIP — PLAY SOMEONE ELSE</button><button class="secondary danger" id="faceQuit">QUIT</button></div>
+</section>
+
+<section id="chatGame" class="screen">
+  <button class="secondary back" id="chatBack">← Dashboard</button>
+  <div class="card"><h2 style="text-align:center">📹 Random Video Chat</h2><p class="status">You are connected to a random player.</p>
+    <div class="videos"><div class="videoCard"><span class="label">YOU</span><video id="localChat" autoplay muted playsinline></video></div><div class="videoCard opponent"><span class="label" id="remoteChatLabel">PLAYER</span><video id="remoteChat" autoplay playsinline></video></div></div>
+    <div class="chatBox"><div class="messages" id="messages"></div><div class="chatRow"><input id="chatInput" maxlength="300" placeholder="Type a message..."><button class="secondary" id="chatSend">SEND</button></div></div>
+    <div class="controls"><button class="secondary" id="chatFriend">👥 ADD FRIEND</button><button class="secondary reportBtn" id="chatReport">🚩 REPORT</button><button class="secondary" id="chatPlayAgain">🔁 PLAY AGAIN WITH THEM</button><button class="secondary" id="chatSkip">SKIP — NEXT PERSON</button><button class="secondary danger" id="chatQuit">QUIT</button></div>
+  </div>
+</section>
+
+<section id="huntGame" class="screen">
+  <button class="secondary back" id="huntBack">← Dashboard</button>
+  <div class="card"><div class="round" id="huntRoundText">Item 1 of 10</div>
+    <div class="huntTarget"><div class="emoji" id="huntTargetEmoji">🧻</div><div class="targetName" id="huntTargetName">TOILET PAPER</div></div>
+    <div class="countdown" id="huntCountdown">GO FIND IT! — 60s</div>
+    <div class="scorebar"><div class="score">You: <span class="live-score" id="huntYourScore">0</span></div><div class="score"><span id="huntOpponentName">PLAYER</span>: <span class="live-score" id="huntOpponentScore">0</span></div></div>
+    <div class="videos"><div class="videoCard"><span class="label">YOUR CAMERA — SHOW THE ITEM HERE</span><video id="localHunt" autoplay muted playsinline></video></div><div class="videoCard opponent"><span class="label" id="remoteHuntLabel">PLAYER</span><video id="remoteHunt" autoplay playsinline></video></div></div>
+    <div class="huntPanel"><div id="huntStatus" class="hunt-status">AI object matching is loading…</div><div class="progress"><div id="huntProgress"></div></div><div class="cameraHint">Hold the requested object clearly in front of your camera. The AI checks the camera feed repeatedly.</div></div>
+    <div class="result" id="huntResult"></div>
+    <div class="controls"><button class="secondary" id="huntFriend">👥 ADD FRIEND</button><button class="secondary reportBtn" id="huntReport">🚩 REPORT</button><button class="secondary" id="huntPlayAgain" style="display:none">🔁 PLAY AGAIN WITH THEM</button><button class="secondary" id="huntSkipItem">⏭️ SKIP ITEM</button><button class="secondary" id="huntSkip">SKIP — PLAY SOMEONE ELSE</button><button class="secondary danger" id="huntQuit">QUIT</button></div>
+  </div>
+</section>
+
+<footer class="footer">Made by Tyler L<br><span class="made-with-heart">Made with ❤️</span></footer>
+</div>
 
 <script type="module">
-
-/*
-==========================================================
-EMOJITV CLIENT
-==========================================================
-*/
-
-let ws = null;
-
-let pc = null;
-
-let stream = null;
-
-let intentionalClose = false;
-
-let reconnectTimer = null;
-
-let peerStarting = false;
-
-let pendingIceCandidates = [];
-
-let currentMode = null;
-
-let currentRoomId = null;
-
-let currentRole = null;
-
-let opponentUsername = "Random Opponent";
-
-let myPlayerId = null;
-
-let sessionId =
-  localStorage.getItem(
-    "emojitv_session"
-  ) ||
-  crypto.randomUUID();
-
-localStorage.setItem(
-  "emojitv_session",
-  sessionId
-);
-
-let username =
-  localStorage.getItem(
-    "emojitv_username"
-  ) ||
-  `Player${Math.floor(
-    Math.random() * 9999
-  )}`;
-
-
-/*
-==========================================================
-SHORTCUT
-==========================================================
-*/
-
-const $ = id =>
-  document.getElementById(id);
-
-
-/*
-==========================================================
-USERNAME
-==========================================================
-*/
-
-$("usernameInput").value =
-  username;
-
-$("saveUsernameBtn").onclick = () => {
-
-  const value =
-    $("usernameInput").value
-      .trim()
-      .slice(0,20);
-
-  if (!value) return;
-
-  username = value;
-
-  localStorage.setItem(
-    "emojitv_username",
-    username
-  );
-
-  connectToServer();
+const $=id=>document.getElementById(id);
+const screens=["home","match","faceGame","chatGame","huntGame"];
+let stream=null,ws=null,pc=null,role=null,currentMode=null,connecting=false,roundToken=0,scoreTimer=null,animationFrame=null,roundActive=false,lastScore=0;
+let faceLandmarker=null,objectMatcher=null,objectMatcherLoading=null,huntScanning=false,huntFoundLocal=false;
+const TOTAL_FACE=5,TOTAL_HUNT=10,HUNT_SECONDS=60;
+let rematchSent=false,dmWith="";
+let huntTimer=null,huntTimeLeft=HUNT_SECONDS,huntConfirmations=0;
+let username=localStorage.getItem("emojitv_username")||"";
+let opponentUsername="";
+let reportMode="";
+const leaderboards={face:[],hunt:[],chat:[],xp:[]};
+let profileData=null;
+const BADGES={
+  "first-win":["🥇","First Win"],
+  "streak-5":["🔥","5 Win Streak"],
+  "streak-10":["⚡","10 Win Streak"],
+  "perfect-face":["🎯","Perfect Face-Off"],
+  "hunt-master":["🔎","Hunt Master"],
+  "friends-10":["👥","10 Friends"],
+  "games-100":["🎮","100 Games"]
 };
+function setUsername(name){username=String(name||"").trim().replace(/\s+/g," ").slice(0,20);if(!username)username="Guest";localStorage.setItem("emojitv_username",username);$("currentUsername").textContent=username;$("usernameInput").value=username;}
+function showNameGate(){$("nameGate").classList.remove("hidden");$("usernameInput").focus();}
+function hideNameGate(){$("nameGate").classList.add("hidden");}
+function renderOnline(m){$("onlineCount").textContent=m.count;$("onlineCountLarge").textContent=m.count;$("onlineNames").innerHTML="";if(!m.names?.length){$("onlineNames").innerHTML='<span class="onlineName">No one online yet</span>';return;}m.names.slice(0,100).forEach(n=>{const el=document.createElement("span");el.className="onlineName";el.textContent=n;el.style.cursor="pointer";el.title="Click to add as a friend";if(n!==username)el.onclick=()=>sendFriendRequest(n);$("onlineNames").appendChild(el);});}
+function renderFriends(m){const box=$("friendsList"),req=$("friendRequests");if(!box||!req)return;req.innerHTML="";(m.pending||[]).forEach(name=>{const row=document.createElement("div");row.className="friendRow";const label=document.createElement("span");label.className="friendRowName";label.textContent="👋 "+name;const btn=document.createElement("button");btn.className="secondary";btn.textContent="ACCEPT";btn.onclick=()=>sendFriendAccept(name);row.append(label,btn);req.appendChild(row);});box.innerHTML="";(m.friends||[]).forEach(f=>{const row=document.createElement("div");row.className="friendRow";const left=document.createElement("div");left.innerHTML=`<div class="friendRowName">${f.online?"🟢":"⚪"} ${escapeHtml(f.username)}</div><div class="tiny" style="text-align:left;margin-top:3px">${f.online?"Online":"Offline"}</div>`;const actions=document.createElement("div");actions.className="friendActions";const msg=document.createElement("button");msg.className="secondary";msg.textContent="💬 MESSAGE";msg.onclick=()=>openDm(f.username);actions.appendChild(msg);if(f.online){[["😀","face","FACE-OFF"],["📹","chat","VIDEO CHAT"],["🧻","hunt","HUNT"]].forEach(([icon,mode,label])=>{const b=document.createElement("button");b.className="secondary";b.textContent=icon;b.title=`Invite to ${label}`;b.onclick=()=>sendGameInvite(f.username,mode);actions.appendChild(b);});}row.append(left,actions);box.appendChild(row);});if(!m.friends?.length&&!m.pending?.length)box.innerHTML='<div class="leaderEmpty">No friends yet. Click an online player to send a friend request.</div>';}
+function requestFriends(){if(ws?.readyState===1)ws.send(JSON.stringify({type:"get-friends"}));}
+function sendFriendRequest(name){if(ws?.readyState===1)ws.send(JSON.stringify({type:"friend-request",to:name}));}
+function sendFriendAccept(name){if(ws?.readyState===1)ws.send(JSON.stringify({type:"friend-accept",from:name}));}
+function sendGameInvite(name,mode){if(ws?.readyState!==1)return;const labels={face:"Emoji Face-Off",chat:"Video Chat",hunt:"Emoji Hunt"};ws.send(JSON.stringify({type:"friend-invite",to:name,mode}));$("friendNotice").textContent=`Sending ${labels[mode]} invite to ${name}…`;}
+function showGameInvite(m){const box=$("gameInvites");const wrap=document.createElement("div");wrap.className="inviteBox";const labels={face:"😀 Emoji Face-Off",chat:"📹 Video Chat",hunt:"🧻 Emoji Hunt"};const title=document.createElement("strong");title.textContent=`🎮 ${m.from} invited you to ${labels[m.mode]}!`;const text=document.createElement("span");text.className="tiny";text.style.textAlign="left";text.style.display="block";text.textContent="Accept to play directly with your friend.";const actions=document.createElement("div");actions.className="inviteActions";const a=document.createElement("button");a.className="secondary";a.textContent="ACCEPT & PLAY";a.onclick=()=>acceptGameInvite(m.inviteId,m.from,m.mode,wrap);const d=document.createElement("button");d.className="secondary";d.textContent="DECLINE";d.onclick=()=>{ws?.send(JSON.stringify({type:"decline-invite",inviteId:m.inviteId}));wrap.remove();};actions.append(a,d);wrap.append(title,text,actions);box.appendChild(wrap);openFriends();}
+async function acceptGameInvite(inviteId,from,mode,wrap){if(!ws||ws.readyState!==1){alert("The server connection is not ready. Try again.");return;}try{currentMode=mode;show("match");$("matchTitle").textContent=`Joining ${from}…`;$('connection').textContent="Camera starting…";$('matchStatus').textContent="Requesting camera and microphone…";clearError();await getCameraAndMic();setLocalVideos();$('connection').textContent="Connected";$('matchStatus').textContent=`Joining ${from}…`;$('gameInvites').innerHTML="";ws.send(JSON.stringify({type:"accept-invite",inviteId}));}catch(err){currentMode=null;show("home");if(err?.name==="NotAllowedError")alert("Allow camera and microphone access to join the game.");else alert("Could not start the camera.");}}
+function openFriends(){requestFriends();$("friendsModal").classList.add("show");$("friendsModal").setAttribute("aria-hidden","false");}
+function closeFriends(){$("friendsModal").classList.remove("show");$("friendsModal").setAttribute("aria-hidden","true");}
+function openDm(name){dmWith=name;$("dmWith").textContent=name;$("dmArea").style.display="block";if(ws?.readyState===1)ws.send(JSON.stringify({type:"get-dm-history",to:name}));}
+function renderDmHistory(msgs){const box=$("dmMessages");box.innerHTML="";(msgs||[]).forEach(m=>appendDm(m));}
+function appendDm(m){const box=$("dmMessages");const div=document.createElement("div");div.className="msg"+(m.from===username?" self":"");div.textContent=(m.from===username?"You: ":m.from+": ")+m.text;box.appendChild(div);box.scrollTop=box.scrollHeight;}
+function sendDm(){const input=$("dmInput"),text=input.value.trim();if(text&&dmWith&&ws?.readyState===1){ws.send(JSON.stringify({type:"dm",to:dmWith,text}));input.value="";}}
+function renderLeaderboard(mode,rows){
+  leaderboards[mode]=rows||[];
+  const box=$(mode+"Leaderboard");
+  if(!box)return;
+  if(!rows?.length){box.innerHTML='<div class="leaderEmpty">No completed games yet.</div>';return;}
+  box.innerHTML=rows.map(r=>`<div class="leaderRow"><span>${r.rank}</span><strong>${escapeHtml(r.username)}</strong><span>${mode==="chat"?`${r.games} chats`:mode==="xp"?`Lv ${r.level} • ${r.xp} XP`:`${r.wins} W • ${r.points} pts`}</span></div>`).join("");
+}
+function renderProfile(m){
+  if(!m)return;
+  profileData=m;
+  $("profileXp").textContent=m.xp;
+  $("profileLevel").textContent=m.level;
+  $("profileLevelLabel").textContent=`Level ${m.level}`;
+  $("profileStreak").textContent=m.streak;
+  $("profileBestStreak").textContent=m.bestStreak;
+  const into=Number(m.xpIntoLevel||0),to=Number(m.xpToNextLevel||500);
+  $("profileXpBar").style.width=Math.min(100,(into/500)*100)+"%";
+  $("profileXpText").textContent=`${into} / 500 XP to next level`;
+  const daily=m.daily?.challenges||[];
+  $("dailyChallenges").innerHTML=daily.map(c=>{const pct=Math.min(100,(c.progress/c.target)*100);return `<div class="challengeRow"><div class="challengeTop"><span class="challengeTitle">${c.completed?"✅ ":""}${escapeHtml(c.title)}</span><strong>${c.progress}/${c.target}</strong></div><div class="xpTrack"><div style="width:${pct}%"></div></div><div class="challengeMeta">Reward: +${c.reward} XP</div></div>`}).join("")||'<div class="leaderEmpty">No challenges today.</div>';
+  const earned=new Set(m.badges||[]);
+  $("badgeList").innerHTML=Object.entries(BADGES).map(([id,[icon,title]])=>`<div class="badgeChip ${earned.has(id)?"":"locked"}" title="${escapeHtml(title)}">${icon} ${escapeHtml(title)}</div>`).join("");
+}
+function showToast(text){const t=$("toast");if(!t)return;t.textContent=text;t.classList.add("show");clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>t.classList.remove("show"),2600);}
+function escapeHtml(v){const d=document.createElement("div");d.textContent=v;return d.innerHTML;}
+function updateOpponentLabels(){
+  const name=opponentUsername||"PLAYER";
+  ["remoteWaitingLabel","remoteFaceLabel","remoteChatLabel","remoteHuntLabel","faceOpponentName","huntOpponentName"].forEach(id=>{if($(id))$(id).textContent=name;});
+}
 
-
-/*
-==========================================================
-SERVER CONNECTION
-==========================================================
-*/
-
-function connectToServer(){
-
-  intentionalClose = false;
-
-  if (
-    ws &&
-    (
-      ws.readyState ===
-      WebSocket.OPEN ||
-      ws.readyState ===
-      WebSocket.CONNECTING
-    )
-  ){
-    return;
-  }
-
-  const protocol =
-    location.protocol === "https:"
-      ? "wss:"
-      : "ws:";
-
-  ws = new WebSocket(
-    `${protocol}//${location.host}`
-  );
-
-  ws.onopen = () => {
-
-    $("onlineText").textContent =
-      "🟢 Connected";
-
-    ws.send(
-      JSON.stringify({
-        type:
-          "set-username",
-
-        username,
-
-        sessionId
-      })
-    );
-
-    /*
-    IMPORTANT:
-    Do NOT automatically match here.
-
-    Matching happens only when the player
-    clicks a game button.
-    */
-
-  };
-
-  ws.onmessage = async event => {
-
-    let message;
-
-    try{
-      message =
-        JSON.parse(
-          event.data
-        );
-    }catch{
+async function shareEmojiTV(){
+  const data={title:"EmojiTV",text:"Play EmojiTV with me!",url:location.href};
+  try{
+    if(navigator.share && (!navigator.canShare || navigator.canShare(data))){
+      await navigator.share(data);
       return;
     }
-
-    await handleMessage(message);
-  };
-
-  ws.onerror = () => {
-
-    $("onlineText").textContent =
-      "🔴 Connection error";
-  };
-
-  ws.onclose = () => {
-
-    $("onlineText").textContent =
-      "🟠 Disconnected";
-
-    if (
-      !intentionalClose
-    ){
-
-      clearTimeout(
-        reconnectTimer
-      );
-
-      reconnectTimer =
-        setTimeout(
-          () => {
-
-            ws = null;
-
-            connectToServer();
-
-          },
-          1200
-        );
+    if(navigator.clipboard){
+      await navigator.clipboard.writeText(location.href);
+      alert("EmojiTV link copied! You can paste it into a message or contact.");
+      return;
     }
-  };
-}
-
-
-/*
-==========================================================
-SERVER MESSAGES
-==========================================================
-*/
-
-async function handleMessage(m){
-
-  if (
-    m.type ===
-    "connected"
-  ){
-    return;
-  }
-
-
-  /*
-  USERNAME
-  */
-
-  if (
-    m.type ===
-    "username-set"
-  ){
-
-    if (
-      m.playerId
-    ){
-      myPlayerId =
-        m.playerId;
-    }
-
-    if (
-      m.sessionId
-    ){
-      sessionId =
-        m.sessionId;
-
-      localStorage.setItem(
-        "emojitv_session",
-        sessionId
-      );
-    }
-
-    return;
-  }
-
-
-  /*
-  WAITING
-  */
-
-  if (
-    m.type ===
-    "waiting"
-  ){
-
-    currentMode =
-      m.mode;
-
-    $("gameStatus").textContent =
-      "Waiting for a random opponent...";
-
-    $("matchText").textContent =
-      "WAITING FOR RANDOM PLAYER";
-
-    $("gameInstruction").textContent =
-      "You do not need to be friends. Someone else playing this game will be matched with you.";
-
-    return;
-  }
-
-
-  /*
-  MATCH FOUND
-  */
-
-  if (
-    m.type ===
-    "match-found"
-  ){
-
-    currentRoomId =
-      m.roomId;
-
-    currentMode =
-      m.mode;
-
-    currentRole =
-      m.role;
-
-    myPlayerId =
-      m.playerId;
-
-    opponentUsername =
-      m.opponentUsername ||
-      "Random Opponent";
-
-    $("opponentName").textContent =
-      opponentUsername;
-
-    $("gameStatus").textContent =
-      "Random opponent found!";
-
-    $("matchText").textContent =
-      "MATCH FOUND!";
-
-    $("gameInstruction").textContent =
-      "Connecting your camera and microphone...";
-
-    $("remotePlaceholder").textContent =
-      "Connecting to your random opponent...";
-
-    /*
-    Start WebRTC.
-    */
-
-    await setupPeer(
-      currentRole
-    );
-
-    return;
-  }
-
-
-  /*
-  ROOM STATE
-  */
-
-  if (
-    m.type ===
-    "room-state"
-  ){
-
-    currentRoomId =
-      m.roomId;
-
-    currentMode =
-      m.mode;
-
-    currentRole =
-      m.role;
-
-    myPlayerId =
-      m.playerId;
-
-    opponentUsername =
-      m.opponentUsername ||
-      "Random Opponent";
-
-    $("opponentName").textContent =
-      opponentUsername;
-
-    if (
-      m.started &&
-      m.opponentUsername &&
-      m.opponentUsername !==
-      "Waiting..."
-    ){
-
-      $("matchText").textContent =
-        "CONNECTED";
-
-      $("gameInstruction").textContent =
-        "Your random opponent is connected.";
-
-      $("remotePlaceholder").classList.add(
-        "hidden"
-      );
-    }
-
-    $("myScore").textContent =
-      m.score || 0;
-
-    $("opponentScore").textContent =
-      m.opponentScore || 0;
-
-    return;
-  }
-
-
-  /*
-  SESSION RESTORED
-  */
-
-  if (
-    m.type ===
-    "session-restored"
-  ){
-
-    myPlayerId =
-      m.playerId ||
-      myPlayerId;
-
-    currentRoomId =
-      m.roomId ||
-      currentRoomId;
-
-    currentMode =
-      m.mode ||
-      currentMode;
-
-    currentRole =
-      m.role ||
-      currentRole;
-
-    opponentUsername =
-      m.opponentUsername ||
-      opponentUsername;
-
-    $("opponentName").textContent =
-      opponentUsername;
-
-    $("gameStatus").textContent =
-      "Game connection restored.";
-
-    $("connectionNotice").classList.add(
-      "hidden"
-    );
-
-    if (
-      currentRole
-    ){
-      await setupPeer(
-        currentRole
-      );
-    }
-
-    return;
-  }
-
-
-  /*
-  OPPONENT TEMPORARILY DISCONNECTED
-  */
-
-  if (
-    m.type ===
-    "opponent-temporarily-disconnected"
-  ){
-
-    $("connectionNotice").classList.remove(
-      "hidden"
-    );
-
-    $("connectionNotice").classList.remove(
-      "successNotice"
-    );
-
-    $("connectionNotice").textContent =
-      "Your opponent temporarily disconnected. Waiting for them to reconnect...";
-
-    $("remotePlaceholder").classList.remove(
-      "hidden"
-    );
-
-    return;
-  }
-
-
-  /*
-  OPPONENT RECONNECTED
-  */
-
-  if (
-    m.type ===
-    "opponent-reconnected"
-  ){
-
-    opponentUsername =
-      m.opponentUsername ||
-      opponentUsername;
-
-    $("opponentName").textContent =
-      opponentUsername;
-
-    $("connectionNotice").classList.add(
-      "hidden"
-    );
-
-    $("remotePlaceholder").classList.add(
-      "hidden"
-    );
-
-    /*
-    Re-negotiate WebRTC.
-    */
-
-    if (
-      currentRole
-    ){
-      await setupPeer(
-        currentRole
-      );
-    }
-
-    return;
-  }
-
-
-  /*
-  WEBRTC SIGNAL
-  */
-
-  if (
-    m.type ===
-    "signal"
-  ){
-
-    await handleSignal(
-      m
-    );
-
-    return;
-  }
-
-
-  /*
-  OPPONENT LEFT
-  */
-
-  if (
-    m.type ===
-    "opponent-left"
-  ){
-
-    $("connectionNotice").classList.remove(
-      "hidden"
-    );
-
-    $("connectionNotice").textContent =
-      "Your opponent left the game.";
-
-    $("remotePlaceholder").classList.remove(
-      "hidden"
-    );
-
-    return;
-  }
-
-
-  /*
-  CHAT
-  */
-
-  if (
-    m.type ===
-    "chat-message"
-  ){
-
-    addChatMessage(
-      m.username ||
-      opponentUsername,
-      m.text
-    );
-
-    return;
-  }
-
-
-  /*
-  SCORE
-  */
-
-  if (
-    m.type ===
-    "opponent-score"
-  ){
-
-    $("opponentScore").textContent =
-      m.score || 0;
-
-    return;
-  }
-
-
-  if (
-    m.type ===
-    "score-updated"
-  ){
-
-    $("myScore").textContent =
-      m.score || 0;
-
-    return;
-  }
-
-
-  /*
-  ROUND RESULT
-  */
-
-  if (
-    m.type ===
-    "round-result"
-  ){
-
-    $("myScore").textContent =
-      m.myScore || 0;
-
-    $("opponentScore").textContent =
-      m.opponentScore || 0;
-
-    if (
-      m.winner ===
-      myPlayerId
-    ){
-
-      $("gameInstruction").textContent =
-        "🏆 YOU WIN!";
-
-    }else if(
-      m.winner
-    ){
-
-      $("gameInstruction").textContent =
-        "Your opponent wins.";
-
-    }else{
-
-      $("gameInstruction").textContent =
-        "It's a tie!";
-    }
-
-    if (
-      m.progress
-    ){
-
-      updateProgress(
-        m.progress
-      );
-    }
-
-    return;
-  }
-
-
-  /*
-  FRIENDS
-  */
-
-  if (
-    m.type ===
-    "friends-list"
-  ){
-
-    renderFriends(
-      m.friends || [],
-      m.pending || []
-    );
-
-    return;
-  }
-
-
-  if (
-    m.type ===
-    "friend-request-received"
-  ){
-
-    if (
-      $("friendsBtn")
-    ){
-
-      alert(
-        `${m.username} sent you a friend request! Open FRIENDS to accept it.`
-      );
-    }
-
-    loadFriends();
-
-    return;
-  }
-
-
-  if (
-    m.type ===
-    "friend-result"
-  ){
-
-    if (
-      m.message
-    ){
-      alert(
-        m.message
-      );
-    }
-
-    loadFriends();
-
-    return;
-  }
-
-
-  /*
-  PROGRESS
-  */
-
-  if (
-    m.type ===
-    "progress"
-  ){
-
-    updateProgress(
-      m.data
-    );
-
-    renderChallenges(
-      m.dailyChallenges ||
-      []
-    );
-
-    renderBadges(
-      m.badges ||
-      []
-    );
-
-    return;
-  }
-
-
-  /*
-  LEADERBOARD
-  */
-
-  if (
-    m.type ===
-    "leaderboard"
-  ){
-
-    renderLeaderboard(
-      m.users ||
-      []
-    );
-
-    return;
-  }
-
-
-  /*
-  SERVER PING
-  */
-
-  if (
-    m.type ===
-    "server-ping"
-  ){
-
-    if (
-      ws?.readyState ===
-      WebSocket.OPEN
-    ){
-
-      ws.send(
-        JSON.stringify({
-          type:
-            "ping"
-        })
-      );
-    }
-
-    return;
+    alert("Copy this link and send it to your contact: "+location.href);
+  }catch(e){
+    if(e?.name!=="AbortError") console.warn("Share failed",e);
   }
 }
 
+function requestLeaderboards(){if(ws?.readyState===1)ws.send(JSON.stringify({type:"get-leaderboards"}));}
+function openReport(mode){reportMode=mode||currentMode||"";$("reportMeta").textContent=`Mode: ${reportMode||"—"} • Connected player: ${opponentUsername||"Unknown"}`;$("reportReason").value="harassment";$("reportDetails").value="";$("reportSuccess").classList.remove("show");$("reportModal").classList.add("show");$("reportModal").setAttribute("aria-hidden","false");}
+function closeReport(){$("reportModal").classList.remove("show");$("reportModal").setAttribute("aria-hidden","true");}
+function submitReport(){if(!ws||ws.readyState!==1){$("reportSuccess").textContent="You are no longer connected to this player.";$("reportSuccess").classList.add("show");return;}ws.send(JSON.stringify({type:"report",mode:reportMode,reason:$("reportReason").value,details:$("reportDetails").value}));}
+function connectLobby(){
+  if(ws?.readyState===1)return;
+  try{ws=new WebSocket(wsUrl());
+    ws.onopen=()=>{$("connection").textContent="Connected";ws.send(JSON.stringify({type:"set-username",username:username||"Guest"}));requestLeaderboards();};
+    ws.onmessage=async e=>{let m;try{m=JSON.parse(e.data)}catch{return;}if(m.type==="ready"){ws.__playerId=m.playerId;ws.send(JSON.stringify({type:"set-username",username:username||"Guest"}));requestLeaderboards();}if(m.type==="online-list")renderOnline(m);if(m.type==="username-saved")setUsername(m.username);if(m.type==="profile")renderProfile(m);if(m.type==="daily-complete")showToast(`🎉 Daily challenge complete: ${m.title} (+${m.reward} XP)`);if(m.mode&&m.rows)renderLeaderboard(m.mode,m.rows);};
+    ws.onclose=()=>{if(currentMode===null){$("connection").textContent="Not connected";setTimeout(()=>{if(currentMode===null)connectLobby();},3000);}};
+    ws.onerror=()=>{};
+  }catch{}
+}
+function saveNameAndContinue(){setUsername($("usernameInput").value);hideNameGate();if(ws?.readyState===1)ws.send(JSON.stringify({type:"set-username",username}));}
 
-/*
-==========================================================
-CAMERA + MICROPHONE
-==========================================================
-*/
 
-async function getLocalMedia(){
+function show(name){screens.forEach(x=>$(x).classList.toggle("active",x===name));}
+function clearError(){$("error").textContent="";$('error').classList.remove("show");$('retry').style.display="none";}
+function setError(t){$('error').textContent=t;$('error').classList.add('show');$('retry').style.display='inline-block';}
+function closeConnection(){if(ws){try{ws.onclose=null;ws.onerror=null;ws.close()}catch{}ws=null}if(pc){try{pc.close()}catch{}pc=null;}}
+function reconnectAfterOpponentLeft(){
+  roundToken++;
+  stopFaceScoring();
+  huntScanning=false;
+  stopHuntTimer();
+  if(pc){try{pc.close()}catch{}pc=null;}
+  ["remoteFace","remoteChat","remoteHunt","remoteWaiting"].forEach(id=>{if($(id))$(id).srcObject=null;});
+  const mode=currentMode;
+  if(!mode)return;
+  closeConnection();
+  opponentUsername="PLAYER";
+  updateOpponentLabels();
+  show("match");
+  $("matchTitle").textContent=mode==="face"?"Finding a new Emoji Face-Off opponent…":mode==="hunt"?"Finding a new Emoji Hunt opponent…":"Finding a new video chat partner…";
+  $("matchStatus").textContent="Opponent disconnected. Finding someone new…";
+  $("connection").textContent="Searching…";
+  setTimeout(()=>{
+    if(currentMode!==mode)return;
+    connectToServer().catch(()=>{
+      if(currentMode===mode){
+        $("matchStatus").textContent="Could not reconnect. Trying again…";
+        setTimeout(()=>{if(currentMode===mode)reconnectAfterOpponentLeft();},1500);
+      }
+    });
+  },900);
+}
+function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}[
+"localWaiting","localFace","remoteWaiting","remoteFace","localChat","remoteChat","localHunt","remoteHunt"
+].forEach(id=>{if($(id))$(id).srcObject=null});}
+function setLocalVideos(){if(!stream)return;["localWaiting","localFace","localChat","localHunt"].forEach(id=>{if($(id))$(id).srcObject=stream});}
+function wsUrl(){return location.protocol==="https:"?`wss://${location.host}`:`ws://${location.host}`;}
 
-  /*
-  Reuse an existing stream whenever possible.
-  */
+async function getCameraAndMic(){
+  if(!window.isSecureContext&&location.hostname!=="localhost")throw new Error("secure");
+  stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:"user"},audio:true});
+  setLocalVideos();await $('localWaiting').play().catch(()=>{});
+}
 
-  if (
-    stream &&
-    stream.active
-  ){
-
-    $("localVideo").srcObject =
-      stream;
-
-    try{
-      await $("localVideo").play();
-    }catch{}
-
-    return stream;
-  }
-
+async function loadFaceScoring(){
+  if(faceLandmarker)return faceLandmarker;
   try{
-
-    stream =
-      await navigator.mediaDevices.getUserMedia({
-        video:{
-          width:{
-            ideal:1280
-          },
-          height:{
-            ideal:720
-          },
-          facingMode:
-            "user"
-        },
-
-        audio:{
-          echoCancellation:true,
-          noiseSuppression:true,
-          autoGainControl:true
-        }
-      });
-
-    $("localVideo").srcObject =
-      stream;
-
-    $("localPlaceholder").classList.add(
-      "hidden"
-    );
-
-    try{
-      await $("localVideo").play();
-    }catch{}
-
-    return stream;
-
-  }catch(error){
-
-    console.error(
-      "Camera/microphone error:",
-      error
-    );
-
-    $("localPlaceholder").classList.remove(
-      "hidden"
-    );
-
-    $("localPlaceholder").textContent =
-      "Camera/microphone permission is required. Please allow camera and microphone access.";
-
-    throw error;
-  }
+    const vision=await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/vision_bundle.mjs");
+    const {FaceLandmarker,FilesetResolver}=vision;
+    const fileset=await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22-rc.20250304/wasm");
+    faceLandmarker=await FaceLandmarker.createFromOptions(fileset,{baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",delegate:"GPU"},runningMode:"VIDEO",numFaces:1,outputFaceBlendshapes:true});
+    $('faceStatus').textContent="Face scoring is ready ✓";return faceLandmarker;
+  }catch(e){console.error(e);$('faceStatus').textContent="Face scoring could not load. Check your internet connection.";return null;}
 }
+function blend(r,n){const c=r?.faceBlendshapes?.[0]?.categories?.find(x=>x.categoryName===n);return c?c.score:0;}
+function expressionScore(target,r){
+  if(!r?.faceLandmarks?.length)return 0;
+  const smile=(blend(r,"mouthSmileLeft")+blend(r,"mouthSmileRight"))/2;
+  const squint=(blend(r,"eyeSquintLeft")+blend(r,"eyeSquintRight"))/2;
+  const open=blend(r,"jawOpen");
+  const funnel=blend(r,"mouthFunnel");
+  const pucker=blend(r,"mouthPucker");
+  const press=(blend(r,"mouthPressLeft")+blend(r,"mouthPressRight"))/2;
+  const browDown=(blend(r,"browDownLeft")+blend(r,"browDownRight"))/2;
+  const browInner=blend(r,"browInnerUp");
+  const eyeWide=(blend(r,"eyeWideLeft")+blend(r,"eyeWideRight"))/2;
+  const blink=(blend(r,"eyeBlinkLeft")+blend(r,"eyeBlinkRight"))/2;
+  const noseSneer=(blend(r,"noseSneerLeft")+blend(r,"noseSneerRight"))/2;
+  const cheek=(blend(r,"cheekSquintLeft")+blend(r,"cheekSquintRight"))/2;
+  const tongue=blend(r,"tongueOut");
+  const upperLip=blend(r,"mouthUpperUpLeft")+blend(r,"mouthUpperUpRight");
+  const lowerLip=blend(r,"mouthLowerDownLeft")+blend(r,"mouthLowerDownRight");
+  const frown=(blend(r,"mouthFrownLeft")+blend(r,"mouthFrownRight"))/2;
 
+  // The face model gives measurable facial landmarks/blendshapes, not literal
+  // emoji recognition. Each emoji is mapped to the closest expression pattern.
+  const happy=["😀","😃","😄","😁","😆","😊","😇","🙂","😉","😌","😋","🤗","🤩","🥳","🥰","😍","😸","😹","😻","😺"];
+  const laugh=["😂","🤣","😹"];
+  const love=["😍","🥰","😘","😗","😙","😚","😻","😽"];
+  const playful=["😛","😝","😜","🤪","😋"];
+  const neutral=["😐","😑","😶","🫥","🫤","😶‍🌫️"];
+  const sad=["😢","😭","😞","😔","😟","😥","😓","🥺","🥹","🙁","☹️"];
+  const angry=["😠","😡","🤬","😤","😮‍💨","👿"];
+  const surprised=["😮","😲","😯","😦","😧","😨","😱","🤯","😳","🫨"];
+  const sleepy=["😴","😪","🤤"];
+  const sick=["😵","😵‍💫","🤢","🤮","🤧","😷","🤒","🤕","🥴"];
 
-/*
-==========================================================
-WEBRTC SETUP
+  let v;
+  if(laugh.includes(target)) v=.42*smile+.24*squint+.22*open+.12*cheek;
+  else if(love.includes(target)) v=.65*smile+.20*squint+.15*pucker;
+  else if(playful.includes(target)) v=.35*smile+.25*open+.25*tongue+.15*lowerLip;
+  else if(happy.includes(target)) v=.68*smile+.20*cheek+.12*squint;
+  else if(angry.includes(target)) v=.42*browDown+.25*press+.20*noseSneer+.13*frown;
+  else if(surprised.includes(target)) v=.45*open+.28*eyeWide+.17*browInner+.10*funnel;
+  else if(sad.includes(target)) v=.40*frown+.28*browInner+.20*lowerLip+.12*eyeWide;
+  else if(neutral.includes(target)) v=Math.max(0,1-(smile*.9+open*.65+browDown*.35+cheek*.4));
+  else if(sleepy.includes(target)) v=.45*blink+.30*(1-eyeWide)+.25*(1-smile);
+  else if(sick.includes(target)) v=.38*noseSneer+.28*frown+.20*open+.14*press;
+  else if(["🤔","🤨","🧐"].includes(target)) v=.38*browInner+.25*(1-smile)+.20*eyeWide+.17*press;
+  else if(["😎"].includes(target)) v=.50*smile+.35*squint+.15*(1-eyeWide);
+  else if(["🤓","🥸","🤠","😈","🤫","🤭","🫢","🫣","🫠","🫡","🙃","😉","🤥","🎃","👻","👽","🤖","💀","☠️","😺","😼","🙀","😿","😾"].includes(target)) v=.45*smile+.25*eyeWide+.15*open+.15*(1-blink);
+  else v=.45*smile+.20*open+.20*eyeWide+.15*browInner;
 
-This is deliberately robust:
+  // Give neutral faces a meaningful baseline only when the expression is actually controlled.
+  const score=Math.max(0,Math.min(100,v*100));
+  return Math.round(score);
+}
+function startFaceScoring(){if(animationFrame)cancelAnimationFrame(animationFrame);const loop=()=>{if(!roundActive){animationFrame=null;return}if(faceLandmarker&&$('localFace').readyState>=2){try{const r=faceLandmarker.detectForVideo($('localFace'),performance.now());lastScore=expressionScore($('faceTarget').textContent,r);$('faceYourScore').textContent=lastScore}catch{}}animationFrame=requestAnimationFrame(loop)};animationFrame=requestAnimationFrame(loop);}
+function stopFaceScoring(){roundActive=false;if(animationFrame)cancelAnimationFrame(animationFrame);animationFrame=null;}
+function runFaceRound(round,target){roundToken++;const token=roundToken;rematchSent=false;stopFaceScoring();if(scoreTimer)clearTimeout(scoreTimer);$("facePlayAgain").style.display="none";$("faceRoundText").textContent=`Round ${round} of ${TOTAL_FACE}`;$("faceTarget").textContent=target;$("faceYourScore").textContent="0";$("faceOpponentScore").textContent="0";$("faceResult").textContent="";let n=5;$("faceCountdown").textContent=`GET READY — ${n}`;const tick=setInterval(()=>{if(token!==roundToken){clearInterval(tick);return;}n--;if(n>0)$("faceCountdown").textContent=`GET READY — ${n}`;else{$("faceCountdown").textContent="MAKE THE FACE! — 10s";clearInterval(tick);roundActive=true;startFaceScoring();let left=10;const timer=setInterval(()=>{if(token!==roundToken){clearInterval(timer);return;}left--;if(left>0)$("faceCountdown").textContent=`MAKE THE FACE! — ${left}s`;else{clearInterval(timer);finishFaceRound(round,token);}},1000);}},1000);}
+function finishFaceRound(round,token){if(token!==roundToken)return;stopFaceScoring();$('faceCountdown').textContent="ROUND OVER!";if(ws?.readyState===1)ws.send(JSON.stringify({type:"round-score",score:lastScore,round}));}
 
-1. Create RTCPeerConnection
-2. Add local camera/audio tracks
-3. Receive remote tracks
-4. Queue ICE candidates that arrive too early
-5. Exchange offer/answer
-6. Use multiple STUN servers
-==========================================================
-*/
+async function loadObjectMatcher(){
+  if(objectMatcher)return objectMatcher;if(objectMatcherLoading)return objectMatcherLoading;
+  objectMatcherLoading=(async()=>{try{
+    $("huntStatus").textContent="Loading the AI object-matching model… (first load can take a while)";
+    const {pipeline,env}=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2");
+    env.allowLocalModels=false;env.useBrowserCache=true;
+    objectMatcher=await pipeline("zero-shot-image-classification","Xenova/clip-vit-base-patch32",{device:"webgpu"}).catch(async()=>pipeline("zero-shot-image-classification","Xenova/clip-vit-base-patch32"));
+    $("huntStatus").textContent="AI object matching is ready ✓";return objectMatcher;
+  }catch(e){console.error(e);$("huntStatus").textContent="AI object matching failed to load. Refresh and try again.";return null;}})();return objectMatcherLoading;
+}
+function huntLabels(target){return [`a clear photo of ${target.label}`,`a ${target.label} being held in a hand`,`a real ${target.label}`,"a different object","an empty scene","a person without the requested object"];}
+async function checkHuntFrame(target,token){
+  if(!huntScanning||huntFoundLocal||token!==roundToken||$("localHunt").readyState<2)return;if(!objectMatcher){setTimeout(()=>checkHuntFrame(target,token),500);return;}
+  const canvas=document.createElement("canvas");canvas.width=512;canvas.height=384;const ctx=canvas.getContext("2d");ctx.drawImage($("localHunt"),0,0,canvas.width,canvas.height);
+  try{
+    const results=await objectMatcher(canvas.toDataURL("image/jpeg",.8),huntLabels(target));
+    if(token!==roundToken||!huntScanning)return;
+    const targetResults=results.filter(x=>x.label.includes(target.label));const best=targetResults.sort((a,b)=>b.score-a.score)[0];const top=results[0];const confidence=best?.score||0;
+    const differentScore=results.find(x=>x.label.includes("different object"))?.score||0;
+    const emptyScore=results.find(x=>x.label.includes("empty scene"))?.score||0;
+    $("huntStatus").textContent=`AI sees: ${top?.label||"nothing yet"} (${Math.round((top?.score||0)*100)}%) — hold the ${target.label} clearly in view`;
+    const pct=Math.max(0,Math.min(100,confidence*100));$("huntProgress").style.width=pct+"%";
+    const strongEnough=confidence>=.55&&confidence>=differentScore+.12&&confidence>=emptyScore+.15;
+    huntConfirmations=strongEnough?huntConfirmations+1:0;
+    if(huntConfirmations>=3){
+      huntFoundLocal=true;huntScanning=false;stopHuntTimer();$("huntCountdown").textContent="ITEM FOUND!";$("huntResult").textContent="📦 You found it first — checking with the server…";if(ws?.readyState===1)ws.send(JSON.stringify({type:"hunt-found",round:Number($("huntRoundText").dataset.round)||1}));
+    }
+  }catch(e){console.warn("Object matching error",e);$("huntStatus").textContent="AI is checking… keep the item large and centered.";}
+  if(huntScanning&&token===roundToken)setTimeout(()=>checkHuntFrame(target,token),800);
+}
+function startHuntRound(round,target){roundToken++;rematchSent=false;stopHuntTimer();$("huntPlayAgain").style.display="none";$("huntSkipItem").style.display="inline-block";$("huntSkipItem").textContent="⏭️ SKIP ITEM";const token=roundToken;huntScanning=false;huntFoundLocal=false;huntConfirmations=0;$("huntRoundText").textContent=`Item ${round} of ${TOTAL_HUNT}`;$("huntRoundText").dataset.round=round;$("huntTargetEmoji").textContent=target.emoji;$("huntTargetName").textContent=target.label.toUpperCase();$("huntCountdown").textContent=`GO FIND IT! — ${HUNT_SECONDS}s`;$("huntResult").textContent="";$("huntProgress").style.width="0%";$("huntStatus").textContent="Get ready…";setTimeout(async()=>{if(token!==roundToken)return;$("huntStatus").textContent=`Loading AI for ${target.label}…`;await loadObjectMatcher();if(token!==roundToken)return;huntScanning=true;startHuntTimer(token);$("huntStatus").textContent=`AI is watching for ${target.label}. Hold it large and centered in your camera.`;checkHuntFrame(target,token);},700);}
 
 async function setupPeer(myRole){
+  pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+  pc.ontrack=e=>{["remoteFace","remoteChat","remoteHunt","remoteWaiting"].forEach(id=>{if($(id))$(id).srcObject=e.streams[0]});};
+  pc.onicecandidate=e=>{if(e.candidate&&ws?.readyState===1)ws.send(JSON.stringify({type:"signal",signal:{candidate:e.candidate}}));};
+  if(myRole==="a"){const offer=await pc.createOffer();await pc.setLocalDescription(offer);ws.send(JSON.stringify({type:"signal",signal:{description:pc.localDescription}}));}
+}
+async function handleSignal(m){if(!pc)return;try{const s=m.signal;if(s.description){await pc.setRemoteDescription(s.description);if(s.description.type==="offer"){const answer=await pc.createAnswer();await pc.setLocalDescription(answer);ws.send(JSON.stringify({type:"signal",signal:{description:pc.localDescription}}));}}else if(s.candidate)await pc.addIceCandidate(s.candidate);}catch(e){console.warn(e);}}
 
-  if (
-    peerStarting
-  ){
-    return;
-  }
+function sendFriendRequestTo(name,resultEl){const to=String(name||"").trim();if(!to||to===username){if(resultEl)resultEl.textContent="Enter another player's username.";return;}if(ws?.readyState!==1){if(resultEl)resultEl.textContent="Connecting…";return;}ws.send(JSON.stringify({type:"friend-request",to}));if(resultEl)resultEl.textContent=`Friend request sent to ${to}.`;}
+function addCurrentOpponentAsFriend(){sendFriendRequestTo(opponentUsername,$("friendNotice"));}
+function startHuntTimer(token){stopHuntTimer();huntTimeLeft=HUNT_SECONDS;$("huntCountdown").textContent=`GO FIND IT! — ${huntTimeLeft}s`;huntTimer=setInterval(()=>{if(token!==roundToken){stopHuntTimer();return;}huntTimeLeft--;if(huntTimeLeft>0)$("huntCountdown").textContent=`GO FIND IT! — ${huntTimeLeft}s`;else{stopHuntTimer();huntScanning=false;$("huntCountdown").textContent="TIME UP!";if(ws?.readyState===1)ws.send(JSON.stringify({type:"hunt-timeout",round:Number($("huntRoundText").dataset.round)||1}));}},1000);}
+function stopHuntTimer(){if(huntTimer){clearInterval(huntTimer);huntTimer=null;}}
 
-  peerStarting = true;
-
-  try{
-
-    /*
-    Close an old peer connection first.
-    */
-
-    if (
-      pc
-    ){
-
-      try{
-        pc.ontrack = null;
-        pc.onicecandidate = null;
-        pc.onconnectionstatechange = null;
-        pc.close();
-      }catch{}
-
-      pc = null;
-    }
-
-    pendingIceCandidates = [];
-
-    /*
-    Get camera + microphone.
-    */
-
-    await getLocalMedia();
-
-    /*
-    Create WebRTC connection.
-    */
-
-    pc =
-      new RTCPeerConnection({
-        iceServers:[
-          {
-            urls:
-              "stun:stun.l.google.com:19302"
-          },
-          {
-            urls:
-              "stun:stun1.l.google.com:19302"
-          }
-        ]
-      });
-
-    /*
-    Add local camera and microphone.
-    */
-
-    if (
-      stream
-    ){
-
-      for (
-        const track
-        of stream.getTracks()
-      ){
-
-        pc.addTrack(
-          track,
-          stream
-        );
-      }
-    }
-
-    /*
-    Receive remote camera/audio.
-    */
-
-    pc.ontrack = event => {
-
-      console.log(
-        "REMOTE TRACK RECEIVED",
-        event.track.kind
-      );
-
-      const remoteStream =
-        event.streams &&
-        event.streams[0];
-
-      if (
-        !remoteStream
-      ){
-        return;
-      }
-
-      const videoIds = [
-        "remoteFace",
-        "remoteChat",
-        "remoteHunt",
-        "remoteWaiting",
-        "remotePose",
-        "remoteLaugh"
-      ];
-
-      for (
-        const id
-        of videoIds
-      ){
-
-        const video =
-          $(id);
-
-        if (
-          !video
-        ){
-          continue;
-        }
-
-        video.srcObject =
-          remoteStream;
-
-        video.autoplay =
-          true;
-
-        video.playsInline =
-          true;
-
-        /*
-        IMPORTANT:
-        Do not mute the remote video.
-        The remote microphone audio comes
-        through this video element.
-        */
-
-        video.muted =
-          false;
-
-        video.volume =
-          1;
-
-        video.classList.add(
-          "hidden"
-        );
-
-        try{
-          video.play();
-        }catch{}
-      }
-
-      /*
-      Show the correct remote video.
-      */
-
-      showRemoteVideo(
-        currentMode
-      );
-
-      $("remotePlaceholder").classList.add(
-        "hidden"
-      );
-
-      $("connectionNotice").classList.add(
-        "hidden"
-      );
+async function connectToServer(){
+  if(connecting)return;connecting=true;clearError();return new Promise((resolve,reject)=>{let settled=false;const finish=(ok,err)=>{if(settled)return;settled=true;connecting=false;clearTimeout(timer);ok?resolve():reject(err)};ws=new WebSocket(wsUrl());const timer=setTimeout(()=>finish(false,new Error("timeout")),10000);
+    ws.onopen=()=>{ $('connection').textContent="Connected"; ws.send(JSON.stringify({type:"set-username",username})); requestLeaderboards(); $('matchStatus').textContent="Camera connected! Finding an opponent…";ws.send(JSON.stringify({type:"find-match",mode:currentMode,username}));finish(true);};
+    ws.onerror=()=>finish(false,new Error("server"));ws.onclose=()=>{$('connection').textContent="Not connected";if(!settled)finish(false,new Error("server"));};
+    ws.onmessage=async e=>{let m;try{m=JSON.parse(e.data)}catch{return}
+      if(m.type==="waiting")$('matchStatus').textContent="Camera is live ✓ Waiting for another player…";
+      if(m.type==="matched"){rematchSent=false;role=m.role;opponentUsername=m.opponentUsername||"PLAYER";updateOpponentLabels();await setupPeer(role);setLocalVideos();$('matchStatus').textContent=`${opponentUsername} found!`;show(m.mode==="face"?"faceGame":m.mode==="chat"?"chatGame":"huntGame");if(m.mode==="face"){loadFaceScoring();runFaceRound(m.round,m.target||"😎");}else if(m.mode==="hunt"){loadObjectMatcher();startHuntRound(m.round,m.target);}else{$('messages').innerHTML="";}}
+      if(m.type==="signal")handleSignal(m);
+      if(m.type==="opponent-score"){$('faceOpponentScore').textContent=m.score;showFaceResultIfReady();}
+      if(m.type==="your-score"){$('faceYourScore').textContent=m.score;lastScore=m.score;showFaceResultIfReady();}
+      if(m.type==="new-round"){if(m.mode==="face")runFaceRound(m.round,m.target);else if(m.mode==="hunt")startHuntRound(m.round,m.target);}
+      if(m.type==="game-over"){stopFaceScoring();huntScanning=false;stopHuntTimer();$("faceCountdown").textContent="GAME OVER!";$("faceResult").textContent="GAME OVER!";$("huntCountdown").textContent="GAME OVER!";$("huntResult").textContent="GAME OVER!";$("facePlayAgain").style.display=currentMode==="face"?"inline-block":"none";$("huntPlayAgain").style.display=currentMode==="hunt"?"inline-block":"none";}
+      if(m.type==="hunt-winner"){huntScanning=false;stopHuntTimer();const mine=m.winnerId===ws.__playerId;$('huntYourScore').textContent=Object.entries(m.scores||{}).find(([id])=>id===ws.__playerId)?.[1]??$('huntYourScore').textContent;$('huntOpponentScore').textContent=Object.entries(m.scores||{}).find(([id])=>id!==ws.__playerId)?.[1]??$('huntOpponentScore').textContent;$('huntCountdown').textContent=mine?"🏆 YOU FOUND IT FIRST!":`😮 ${opponentUsername||"PLAYER"} FOUND IT FIRST!`;$('huntResult').textContent=mine?"+1 POINT!":"No point this round.";}
+      if(m.type==="rematch-status"){$("facePlayAgain").textContent=m.ready===1?"✓ WAITING FOR THEM…":"🔁 PLAY AGAIN WITH THEM";$("huntPlayAgain").textContent=m.ready===1?"✓ WAITING FOR THEM…":"🔁 PLAY AGAIN WITH THEM";$("chatPlayAgain").textContent=m.ready===1?"✓ WAITING FOR THEM…":"🔁 PLAY AGAIN WITH THEM";}
+      if(m.type==="rematch-started"){rematchSent=false;$("faceYourScore").textContent="0";$("faceOpponentScore").textContent="0";$("huntYourScore").textContent="0";$("huntOpponentScore").textContent="0";if(m.mode==="face"){show("faceGame");runFaceRound(m.round,m.target);}else if(m.mode==="hunt"){show("huntGame");startHuntRound(m.round,m.target);}else{$("messages").innerHTML="";show("chatGame");}}
+      if(m.type==="skip-item-status"){$("huntSkipItem").textContent=m.ready===1?"✓ WAITING FOR THEM…":"⏭️ SKIP ITEM";}
+      if(m.type==="skip-item-result"&&!m.ok)alert(m.error||"Unable to skip this item.");if(m.type==="hunt-timeout"){huntScanning=false;stopHuntTimer();$("huntCountdown").textContent="TIME UP!";$("huntResult").textContent="No point this round.";}
+      if(m.type==="friend-request-received"){if($("friendsModal").classList.contains("show"))requestFriends();else alert(`${m.from} sent you a friend request. Open FRIENDS to accept it.`);}
+      if(m.type==="game-invite")showGameInvite(m);
+      if(m.type==="invite-result")$("friendNotice").textContent=m.message||m.error||"";
+      if(m.type==="invite-declined")$("friendNotice").textContent=`${m.from} declined the game invite.`;
+      if(m.type==="friend-result"){$("friendNotice").textContent=m.message||m.error||"";requestFriends();}
+      if(m.type==="friends")renderFriends(m);
+      if(m.type==="dm-history"&&m.with===dmWith)renderDmHistory(m.messages);
+      if(m.type==="dm"&&m.from===dmWith)appendDm(m);
+      if(m.type==="chat-message"){const div=document.createElement("div");div.className="msg"+(m.self?" self":"");div.textContent=(m.self?"You: ":"Them: ")+m.text;$('messages').appendChild(div);$('messages').scrollTop=$('messages').scrollHeight;}
+      if(m.type==="profile")renderProfile(m);
+      if(m.type==="daily-complete")showToast(`🎉 Daily challenge complete: ${m.title} (+${m.reward} XP)`);
+      if(m.type==="report-result"){if(m.ok){$("reportSuccess").textContent=`Report submitted ✓ Reference: ${m.reportId.slice(0,8)}`;$("reportSuccess").classList.add("show");setTimeout(closeReport,1400);}else{$("reportSuccess").textContent=m.error||"Could not submit report.";$("reportSuccess").classList.add("show");}}if(m.type==="opponent-left"||m.type==="opponent-disconnected"){reconnectAfterOpponentLeft();}
+      if(m.type==="ready"){ws.__playerId=m.playerId;ws.send(JSON.stringify({type:"set-username",username}));requestLeaderboards();}
+      if(m.type==="online-list")renderOnline(m);
+      if(m.type==="username-saved"){setUsername(m.username);}
+      if(m.mode && m.rows)renderLeaderboard(m.mode,m.rows);
     };
-
-    /*
-    ICE candidate handling.
-    */
-
-    pc.onicecandidate =
-      event => {
-
-        if (
-          !event.candidate
-        ){
-          return;
-        }
-
-        sendSignal({
-          candidate:
-            event.candidate
-        });
-      };
-
-    /*
-    Connection state.
-    */
-
-    pc.onconnectionstatechange =
-      () => {
-
-        console.log(
-          "WebRTC connection:",
-          pc.connectionState
-        );
-
-        if (
-          pc.connectionState ===
-          "connected"
-        ){
-
-          $("remotePlaceholder").classList.add(
-            "hidden"
-          );
-
-          $("connectionNotice").classList.add(
-            "hidden"
-          );
-
-          $("gameStatus").textContent =
-            "🟢 Connected to your random opponent";
-
-          $("gameInstruction").textContent =
-            "You can see and hear your opponent.";
-
-        }
-
-        if (
-          pc.connectionState ===
-          "disconnected"
-        ){
-
-          $("connectionNotice").classList.remove(
-            "hidden"
-          );
-
-          $("connectionNotice").textContent =
-            "Connection interrupted. Trying to reconnect...";
-
-        }
-
-        if (
-          pc.connectionState ===
-          "failed"
-        ){
-
-          $("connectionNotice").classList.remove(
-            "hidden"
-          );
-
-          $("connectionNotice").textContent =
-            "Video connection failed. Trying to reconnect...";
-        }
-      };
-
-    /*
-    ROLE A creates the offer.
-    */
-
-    if (
-      myRole ===
-      "a"
-    ){
-
-      const offer =
-        await pc.createOffer({
-          offerToReceiveAudio:
-            true,
-
-          offerToReceiveVideo:
-            true
-        });
-
-      await pc.setLocalDescription(
-        offer
-      );
-
-      sendSignal({
-        description:
-          pc.localDescription
-      });
-    }
-
-  }catch(error){
-
-    console.error(
-      "WebRTC setup error:",
-      error
-    );
-
-    $("gameStatus").textContent =
-      "Camera connection error";
-
-  }finally{
-
-    peerStarting =
-      false;
-  }
+  });
 }
+function showFaceResultIfReady(){if($('faceCountdown').textContent!=="ROUND OVER!")return;const a=Number($('faceYourScore').textContent),b=Number($('faceOpponentScore').textContent);$('faceResult').textContent=a>b?"🏆 YOU WIN THIS ROUND!":a<b?`😮 ${opponentUsername||"PLAYER"} WINS THIS ROUND!`:"🤝 TIE!";setTimeout(()=>{if(ws?.readyState===1)ws.send(JSON.stringify({type:"next-round"}))},1200);}
 
-
-/*
-==========================================================
-SEND WEBRTC SIGNAL
-==========================================================
-*/
-
-function sendSignal(signal){
-
-  if (
-    !ws ||
-    ws.readyState !==
-    WebSocket.OPEN
-  ){
-    return;
-  }
-
-  ws.send(
-    JSON.stringify({
-      type:
-        "signal",
-
-      signal
-    })
-  );
+async function startMode(mode){
+  closeConnection();
+  currentMode=mode;show("match");$('matchTitle').textContent=mode==="face"?"Finding an Emoji Face-Off opponent…":mode==="hunt"?"Finding an Emoji Hunt opponent…":"Finding a video chat partner…";$('connection').textContent="Camera starting…";$('matchStatus').textContent="Requesting camera and microphone…";clearError();
+  try{await getCameraAndMic();setLocalVideos();$('connection').textContent="Camera connected";await connectToServer();}catch(err){$('connection').textContent="Not connected";if(err?.name==="NotAllowedError")setError("Camera/microphone access was blocked. Allow both in your browser, then press RETRY.");else if(err?.name==="NotFoundError")setError("No camera or microphone was found. Check your Logitech webcam and Fifine mic.");else if(err?.message==="secure")setError("Use the published https://emojitv.onrender.com site.");else setError("The game server could not be reached. Press RETRY.");}
 }
-
-
-/*
-==========================================================
-HANDLE WEBRTC SIGNAL
-==========================================================
-*/
-
-async function handleSignal(message){
-
-  if (
-    !message ||
-    !message.signal
-  ){
-    return;
-  }
-
-  /*
-  If our peer connection doesn't exist yet,
-  create it as the receiving side.
-  */
-
-  if (
-    !pc
-  ){
-
-    await setupPeer(
-      currentRole || "b"
-    );
-  }
-
-  if (
-    !pc
-  ){
-    return;
-  }
-
-  const signal =
-    message.signal;
-
-  try{
-
-    /*
-    OFFER OR ANSWER
-    */
-
-    if (
-      signal.description
-    ){
-
-      const description =
-        signal.description;
-
-      /*
-      Prevent invalid duplicate descriptions.
-      */
-
-      if (
-        pc.signalingState ===
-        "closed"
-      ){
-        return;
-      }
-
-      await pc.setRemoteDescription(
-        description
-      );
-
-      /*
-      If this is an offer,
-      create an answer.
-      */
-
-      if (
-        description.type ===
-        "offer"
-      ){
-
-        const answer =
-          await pc.createAnswer({
-            offerToReceiveAudio:
-              true,
-
-            offerToReceiveVideo:
-              true
-          });
-
-        await pc.setLocalDescription(
-          answer
-        );
-
-        sendSignal({
-          description:
-            pc.localDescription
-        });
-      }
-
-      /*
-      ICE candidates that arrived before
-      the remote description are now safe
-      to add.
-      */
-
-      if (
-        pendingIceCandidates.length
-      ){
-
-        const candidates =
-          [...pendingIceCandidates];
-
-        pendingIceCandidates = [];
-
-        for (
-          const candidate
-          of candidates
-        ){
-
-          try{
-
-            await pc.addIceCandidate(
-              candidate
-            );
-
-          }catch(error){
-
-            console.warn(
-              "Queued ICE error:",
-              error
-            );
-          }
-        }
-      }
-
-      return;
-    }
-
-
-    /*
-    ICE CANDIDATE
-    */
-
-    if (
-      signal.candidate
-    ){
-
-      /*
-      ICE can arrive BEFORE the offer/answer.
-
-      Queue it until a remote description
-      exists.
-      */
-
-      if (
-        !pc.remoteDescription
-      ){
-
-        pendingIceCandidates.push(
-          signal.candidate
-        );
-
-        return;
-      }
-
-      await pc.addIceCandidate(
-        signal.candidate
-      );
-    }
-
-  }catch(error){
-
-    console.warn(
-      "WebRTC signaling error:",
-      error
-    );
-  }
-}
-
-
-/*
-==========================================================
-REMOTE VIDEO SELECTION
-==========================================================
-*/
-
-function showRemoteVideo(mode){
-
-  const ids = [
-    "remoteFace",
-    "remoteChat",
-    "remoteHunt",
-    "remoteWaiting",
-    "remotePose",
-    "remoteLaugh"
-  ];
-
-  for (
-    const id
-    of ids
-  ){
-
-    $(id)?.classList.add(
-      "hidden"
-    );
-  }
-
-  let selected =
-    "remoteFace";
-
-  if (
-    mode ===
-    "chat"
-  ){
-    selected =
-      "remoteChat";
-  }
-
-  if (
-    mode ===
-    "hunt"
-  ){
-    selected =
-      "remoteHunt";
-  }
-
-  if (
-    mode ===
-    "pose"
-  ){
-    selected =
-      "remotePose";
-  }
-
-  if (
-    mode ===
-    "laugh"
-  ){
-    selected =
-      "remoteLaugh";
-  }
-
-  $(selected)?.classList.remove(
-    "hidden"
-  );
-}
-
-
-/*
-==========================================================
-START RANDOM GAME
-==========================================================
-*/
-
-async function startGame(mode){
-
-  currentMode =
-    mode;
-
-  intentionalClose =
-    false;
-
-  /*
-  Make sure server is connected.
-  */
-
-  if (
-    !ws ||
-    ws.readyState !==
-    WebSocket.OPEN
-  ){
-
-    connectToServer();
-
-    /*
-    Give WebSocket a moment to connect.
-    */
-
-    await waitForSocket();
-
-    if (
-      !ws ||
-      ws.readyState !==
-      WebSocket.OPEN
-    ){
-
-      alert(
-        "Could not connect to EmojiTV. Please try again."
-      );
-
-      return;
-    }
-  }
-
-  /*
-  Get camera permission BEFORE entering
-  the matchmaking queue.
-
-  This makes sure the camera is ready
-  when the random player connects.
-  */
-
-  try{
-
-    await getLocalMedia();
-
-  }catch{
-
-    return;
-  }
-
-  /*
-  Show game screen.
-  */
-
-  $("home").classList.add(
-    "hidden"
-  );
-
-  $("game").classList.remove(
-    "hidden"
-  );
-
-  $("gameModeTitle").textContent =
-    getModeName(mode);
-
-  $("gameStatus").textContent =
-    "Finding a random opponent...";
-
-  $("matchText").textContent =
-    "SEARCHING FOR RANDOM PLAYER";
-
-  $("gameInstruction").textContent =
-    "You do not need to be friends with anyone.";
-
-  $("targetEmoji").textContent =
-    mode === "chat"
-      ? "💬"
-      : "🎭";
-
-  $("countdown").textContent =
-    "";
-
-  $("myScore").textContent =
-    "0";
-
-  $("opponentScore").textContent =
-    "0";
-
-  $("connectionNotice").classList.add(
-    "hidden"
-  );
-
-  $("remotePlaceholder").classList.remove(
-    "hidden"
-  );
-
-  $("remotePlaceholder").textContent =
-    "Waiting for a random opponent...";
-
-  showRemoteVideo(
-    mode
-  );
-
-  /*
-  Ask server for a RANDOM opponent.
-
-  IMPORTANT:
-  There is NO friend check here.
-  */
-
-  ws.send(
-    JSON.stringify({
-      type:
-        "find-match",
-
-      mode,
-
-      username,
-
-      sessionId
-    })
-  );
-
-  /*
-  Start chat UI only for chat.
-  */
-
-  if (
-    mode ===
-    "chat"
-  ){
-
-    $("chatBox").classList.remove(
-      "hidden"
-    );
-
-  }else{
-
-    $("chatBox").classList.add(
-      "hidden"
-    );
-  }
-
-  /*
-  Hide/show game-specific controls.
-  */
-
-  $("skipBtn").classList.toggle(
-    "hidden",
-    mode !== "hunt"
-  );
-
-  /*
-  Give the connection a little time to
-  establish, but don't block matchmaking.
-  */
-
-  setTimeout(
-    () => {
-
-      if (
-        currentRoomId &&
-        pc &&
-        pc.connectionState ===
-        "connected"
-      ){
-
-        $("gameInstruction").textContent =
-          "You can see and hear your random opponent.";
-      }
-
-    },
-    2000
-  );
-}
-
-
-/*
-==========================================================
-WAIT FOR SOCKET
-==========================================================
-*/
-
-function waitForSocket(){
-
-  return new Promise(
-    resolve => {
-
-      const start =
-        Date.now();
-
-      const check =
-        () => {
-
-          if (
-            ws &&
-            ws.readyState ===
-            WebSocket.OPEN
-          ){
-
-            resolve();
-
-            return;
-          }
-
-          if (
-            Date.now() -
-            start >
-            7000
-          ){
-
-            resolve();
-
-            return;
-          }
-
-          setTimeout(
-            check,
-            100
-          );
-        };
-
-      check();
-    }
-  );
-}
-
-
-/*
-==========================================================
-GAME NAMES
-==========================================================
-*/
-
-function getModeName(mode){
-
-  const names = {
-    face:
-      "😎 Face-Off",
-
-    chat:
-      "💬 Video Chat",
-
-    hunt:
-      "🔎 Emoji Hunt",
-
-    pose:
-      "🕺 Pose Battle",
-
-    laugh:
-      "😂 Laugh Battle"
-  };
-
-  return (
-    names[mode] ||
-    "🎮 EmojiTV"
-  );
-}
-
-
-/*
-==========================================================
-LEAVE GAME
-==========================================================
-*/
-
-function leaveToHome(){
-
-  intentionalClose =
-    true;
-
-  /*
-  Tell server this is an intentional
-  leave. This DOES end the session.
-  */
-
-  if (
-    ws &&
-    ws.readyState ===
-    WebSocket.OPEN
-  ){
-
-    ws.send(
-      JSON.stringify({
-        type:
-          "leave"
-      })
-    );
-  }
-
-  /*
-  Stop peer connection.
-  */
-
-  if (
-    pc
-  ){
-
-    try{
-      pc.close();
-    }catch{}
-
-    pc = null;
-  }
-
-  /*
-  Stop camera/microphone.
-  */
-
-  if (
-    stream
-  ){
-
-    for (
-      const track
-      of stream.getTracks()
-    ){
-
-      track.stop();
-    }
-
-    stream = null;
-  }
-
-  $("localVideo").srcObject =
-    null;
-
-  for (
-    const id
-    of [
-      "remoteFace",
-      "remoteChat",
-      "remoteHunt",
-      "remoteWaiting",
-      "remotePose",
-      "remoteLaugh"
-    ]
-  ){
-
-    if (
-      $(id)
-    ){
-
-      $(id).srcObject =
-        null;
-    }
-  }
-
-  currentRoomId =
-    null;
-
-  currentRole =
-    null;
-
-  currentMode =
-    null;
-
-  opponentUsername =
-    "Random Opponent";
-
-  $("game").classList.add(
-    "hidden"
-  );
-
-  $("home").classList.remove(
-    "hidden"
-  );
-
-  $("chatBox").classList.add(
-    "hidden"
-  );
-}
-
-
-/*
-==========================================================
-CHAT
-==========================================================
-*/
-
-function addChatMessage(
-  name,
-  text
-){
-
-  const box =
-    $("chatMessages");
-
-  const row =
-    document.createElement(
-      "div"
-    );
-
-  row.className =
-    "chatMessage";
-
-  const safeName =
-    String(name)
-      .replace(
-        /[<>]/g,
-        ""
-      );
-
-  const safeText =
-    String(text)
-      .replace(
-        /[<>]/g,
-        ""
-      );
-
-  row.innerHTML =
-    `<span class="chatName">${safeName}:</span> ${safeText}`;
-
-  box.appendChild(
-    row
-  );
-
-  box.scrollTop =
-    box.scrollHeight;
-}
-
-function sendChat(){
-
-  const input =
-    $("chatInput");
-
-  const text =
-    input.value
-      .trim()
-      .slice(
-        0,
-        300
-      );
-
-  if (
-    !text
-  ){
-    return;
-  }
-
-  if (
-    !ws ||
-    ws.readyState !==
-    WebSocket.OPEN
-  ){
-    return;
-  }
-
-  addChatMessage(
-    username,
-    text
-  );
-
-  ws.send(
-    JSON.stringify({
-      type:
-        "chat-message",
-
-      text
-    })
-  );
-
-  input.value =
-    "";
-}
-
-
-/*
-==========================================================
-FRIENDS
-==========================================================
-*/
-
-function loadFriends(){
-
-  if (
-    !ws ||
-    ws.readyState !==
-    WebSocket.OPEN
-  ){
-    return;
-  }
-
-  ws.send(
-    JSON.stringify({
-      type:
-        "get-friends"
-    })
-  );
-}
-
-function renderFriends(
-  friends,
-  pending
-){
-
-  const list =
-    $("friendList");
-
-  list.innerHTML =
-    "";
-
-  if (
-    pending.length
-  ){
-
-    const title =
-      document.createElement(
-        "div"
-      );
-
-    title.innerHTML =
-      "<strong>Pending requests</strong>";
-
-    list.appendChild(
-      title
-    );
-
-    for (
-      const name
-      of pending
-    ){
-
-      const row =
-        document.createElement(
-          "div"
-        );
-
-      row.className =
-        "friendRow";
-
-      const label =
-        document.createElement(
-          "span"
-        );
-
-      label.textContent =
-        name;
-
-      const button =
-        document.createElement(
-          "button"
-        );
-
-      button.className =
-        "primary";
-
-      button.textContent =
-        "ACCEPT";
-
-      button.onclick =
-        () => {
-
-          if (
-            ws?.readyState ===
-            WebSocket.OPEN
-          ){
-
-            ws.send(
-              JSON.stringify({
-                type:
-                  "friend-accept",
-
-                username:
-                  name
-              })
-            );
-          }
-        };
-
-      row.appendChild(
-        label
-      );
-
-      row.appendChild(
-        button
-      );
-
-      list.appendChild(
-        row
-      );
-    }
-  }
-
-  if (
-    friends.length
-  ){
-
-    const title =
-      document.createElement(
-        "div"
-      );
-
-    title.style.marginTop =
-      "15px";
-
-    title.innerHTML =
-      "<strong>Your friends</strong>";
-
-    list.appendChild(
-      title
-    );
-
-    for (
-      const name
-      of friends
-    ){
-
-      const row =
-        document.createElement(
-          "div"
-        );
-
-      row.className =
-        "friendRow";
-
-      row.textContent =
-        name;
-
-      list.appendChild(
-        row
-      );
-    }
-  }
-
-  if (
-    !friends.length &&
-    !pending.length
-  ){
-
-    const empty =
-      document.createElement(
-        "div"
-      );
-
-    empty.style.color =
-      "#94a3b8";
-
-    empty.textContent =
-      "No friends or pending requests yet.";
-
-    list.appendChild(
-      empty
-    );
-  }
-}
-
-function sendFriendRequest(){
-
-  const input =
-    $("friendInput");
-
-  const target =
-    input.value
-      .trim()
-      .slice(
-        0,
-        20
-      );
-
-  if (
-    !target
-  ){
-    return;
-  }
-
-  if (
-    !ws ||
-    ws.readyState !==
-    WebSocket.OPEN
-  ){
-    alert(
-      "You are not connected."
-    );
-
-    return;
-  }
-
-  ws.send(
-    JSON.stringify({
-      type:
-        "friend-request",
-
-      username:
-        target
-    })
-  );
-
-  input.value =
-    "";
-}
-
-
-/*
-==========================================================
-PROGRESS
-==========================================================
-*/
-
-function updateProgress(data){
-
-  if (
-    !data
-  ){
-    return;
-  }
-
-  $("levelStat").textContent =
-    data.level || 1;
-
-  $("levelStat2").textContent =
-    data.level || 1;
-
-  $("xpStat").textContent =
-    data.xp || 0;
-
-  $("gamesStat").textContent =
-    data.games || 0;
-
-  $("winsStat").textContent =
-    data.wins || 0;
-
-  $("lossesStat").textContent =
-    data.losses || 0;
-
-  $("streakStat").textContent =
-    data.streak || 0;
-
-  $("bestStreakStat").textContent =
-    data.bestStreak || 0;
-
-  const level =
-    data.level || 1;
-
-  const xp =
-    data.xp || 0;
-
-  $("nextLevelText").textContent =
-    `${xp} / ${level * 500} to next level`;
-}
-
-function loadProgress(){
-
-  if (
-    !ws ||
-    ws.readyState !==
-    WebSocket.OPEN
-  ){
-    return;
-  }
-
-  ws.send(
-    JSON.stringify({
-      type:
-        "get-progress"
-    })
-  );
-}
-
-function renderChallenges(
-  challenges
-){
-
-  const box =
-    $("challengeList");
-
-  box.innerHTML =
-    "";
-
-  for (
-    const challenge
-    of challenges
-  ){
-
-    const div =
-      document.createElement(
-        "div"
-      );
-
-    div.className =
-      "challenge";
-
-    div.textContent =
-      `🎯 ${challenge}`;
-
-    box.appendChild(
-      div
-    );
-  }
-}
-
-function renderBadges(
-  badgeNames
-){
-
-  const box =
-    $("badgeList");
-
-  box.innerHTML =
-    "";
-
-  for (
-    const badge
-    of badgeNames
-  ){
-
-    const div =
-      document.createElement(
-        "div"
-      );
-
-    div.className =
-      "badge";
-
-    div.textContent =
-      `🏅 ${badge}`;
-
-    box.appendChild(
-      div
-    );
-  }
-}
-
-
-/*
-==========================================================
-LEADERBOARD
-==========================================================
-*/
-
-function loadLeaderboard(){
-
-  if (
-    !ws ||
-    ws.readyState !==
-    WebSocket.OPEN
-  ){
-    return;
-  }
-
-  ws.send(
-    JSON.stringify({
-      type:
-        "leaderboard"
-    })
-  );
-}
-
-function renderLeaderboard(
-  players
-){
-
-  const list =
-    $("leaderList");
-
-  list.innerHTML =
-    "";
-
-  if (
-    !players.length
-  ){
-
-    list.textContent =
-      "No players yet.";
-
-    return;
-  }
-
-  for (
-    const player
-    of players
-  ){
-
-    const item =
-      document.createElement(
-        "div"
-      );
-
-    item.className =
-      "leaderItem";
-
-    item.innerHTML =
-      `<strong>#${player.rank} ${escapeHTML(player.username)}</strong>
-       <div>Level ${player.level}</div>
-       <div>${player.wins} wins</div>
-       <div>${player.xp} XP</div>`;
-
-    list.appendChild(
-      item
-    );
-  }
-}
-
-function escapeHTML(value){
-
-  return String(value)
-    .replace(
-      /&/g,
-      "&amp;"
-    )
-    .replace(
-      /</g,
-      "&lt;"
-    )
-    .replace(
-      />/g,
-      "&gt;"
-    )
-    .replace(
-      /"/g,
-      "&quot;"
-    )
-    .replace(
-      /'/g,
-      "&#039;"
-    );
-}
-
-
-/*
-==========================================================
-BUTTONS
-==========================================================
-*/
-
-document
-  .querySelectorAll(
-    "[data-mode]"
-  )
-  .forEach(
-    button => {
-
-      button.onclick =
-        () => {
-
-          startGame(
-            button.dataset.mode
-          );
-        };
-    }
-  );
-
-$("leaveBtn").onclick =
-  leaveToHome;
-
-$("sendChatBtn").onclick =
-  sendChat;
-
-$("chatInput").addEventListener(
-  "keydown",
-  event => {
-
-    if (
-      event.key ===
-      "Enter"
-    ){
-
-      sendChat();
-    }
-  }
-);
-
-$("addFriendBtn").onclick =
-  sendFriendRequest;
-
-$("friendsBtn").onclick =
-  () => {
-
-    loadFriends();
-
-    alert(
-      "Your friends and pending friend requests are shown in the Friends section."
-    );
-  };
-
-$("leaderBtn").onclick =
-  () => {
-
-    const panel =
-      $("leaderPanel");
-
-    panel.classList.toggle(
-      "show"
-    );
-
-    if (
-      panel.classList.contains(
-        "show"
-      )
-    ){
-
-      loadLeaderboard();
-    }
-  };
-
-$("addOpponentBtn").onclick =
-  () => {
-
-    if (
-      !opponentUsername ||
-      opponentUsername ===
-      "Random Opponent" ||
-      opponentUsername ===
-      "Waiting..."
-    ){
-
-      return;
-    }
-
-    $("friendInput").value =
-      opponentUsername;
-
-    sendFriendRequest();
-  };
-
-$("skipBtn").onclick =
-  () => {
-
-    if (
-      ws?.readyState ===
-      WebSocket.OPEN
-    ){
-
-      ws.send(
-        JSON.stringify({
-          type:
-            "skip"
-        })
-      );
-    }
-  };
-
-
-/*
-==========================================================
-INITIALIZE
-==========================================================
-*/
-
-connectToServer();
-
-setTimeout(
-  loadProgress,
-  1000
-);
-
-setInterval(
-  loadProgress,
-  15000
-);
+function leaveToHome(){roundToken++;stopFaceScoring();huntScanning=false;stopHuntTimer();closeConnection();stopCamera();currentMode=null;$('connection').textContent="Not connected";show("home");setTimeout(connectLobby,100);}
+function skip(){roundToken++;stopFaceScoring();huntScanning=false;stopHuntTimer();if(ws?.readyState===1)ws.send(JSON.stringify({type:"skip"}));if(pc){try{pc.close()}catch{}pc=null}$('remoteFace').srcObject=null;$('remoteChat').srcObject=null;$('remoteHunt').srcObject=null;$('remoteWaiting').srcObject=null;$('matchStatus').textContent="Finding someone new…";$('connection').textContent="Searching…";show("match");}
+function sendChat(){const input=$('chatInput'),text=input.value.trim();if(text&&ws?.readyState===1){ws.send(JSON.stringify({type:"chat-message",text}));input.value="";}}
+
+if(username){setUsername(username);hideNameGate();}else{showNameGate();}
+connectLobby();
+$("dashboardShare").onclick=shareEmojiTV;$("friendSearchButton").onclick=()=>sendFriendRequestTo($("friendSearchInput").value,$("friendSearchResult"));$("friendSearchInput").addEventListener("keydown",e=>{if(e.key==="Enter")sendFriendRequestTo($("friendSearchInput").value,$("friendSearchResult"));});$("faceFriend").onclick=addCurrentOpponentAsFriend;$("chatFriend").onclick=addCurrentOpponentAsFriend;$("huntFriend").onclick=addCurrentOpponentAsFriend;$("saveUsername").onclick=saveNameAndContinue;$("usernameInput").addEventListener("keydown",e=>{if(e.key==="Enter")saveNameAndContinue();});$("changeUsername").onclick=()=>{showNameGate();$("usernameInput").select();};$("leaderboardToggle").onclick=()=>{$("leaderPanel").classList.toggle("show");requestLeaderboards();};
+document.querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>{if(!username){showNameGate();return;}startMode(b.dataset.mode);});$('cancel').onclick=leaveToHome;$('matchBack').onclick=leaveToHome;$('retry').onclick=()=>startMode(currentMode||"face");$('faceBack').onclick=leaveToHome;$('chatBack').onclick=leaveToHome;$('huntBack').onclick=leaveToHome;$('faceSkip').onclick=skip;$('chatSkip').onclick=skip;$('huntSkip').onclick=skip;$('faceQuit').onclick=leaveToHome;$('chatQuit').onclick=leaveToHome;$('huntQuit').onclick=leaveToHome;$('faceReport').onclick=()=>openReport('face');$('chatReport').onclick=()=>openReport('chat');$('huntReport').onclick=()=>openReport('hunt');$('reportCancel').onclick=closeReport;$('reportSubmit').onclick=submitReport;$("reportModal").addEventListener('click',e=>{if(e.target.id==="reportModal")closeReport()});;$('chatSend').onclick=sendChat;$('chatInput').addEventListener("keydown",e=>{if(e.key==="Enter")sendChat()});window.addEventListener("beforeunload",()=>{closeConnection();stopCamera()});
+$("friendsToggle").onclick=openFriends;$("friendsClose").onclick=closeFriends;$("dmSend").onclick=sendDm;$("dmInput").addEventListener("keydown",e=>{if(e.key==="Enter")sendDm()});$("friendsModal").addEventListener("click",e=>{if(e.target.id==="friendsModal")closeFriends()});$("facePlayAgain").onclick=()=>{if(ws?.readyState===1&&!rematchSent){rematchSent=true;ws.send(JSON.stringify({type:"rematch-ready"}));}};$("huntPlayAgain").onclick=()=>{if(ws?.readyState===1&&!rematchSent){rematchSent=true;ws.send(JSON.stringify({type:"rematch-ready"}));}};$("chatPlayAgain").onclick=()=>{if(ws?.readyState===1&&!rematchSent){rematchSent=true;ws.send(JSON.stringify({type:"rematch-ready"}));}};$("huntSkipItem").onclick=()=>{if(ws?.readyState===1)ws.send(JSON.stringify({type:"skip-item"}));};
 
 </script>
-
 </body>
 </html>
