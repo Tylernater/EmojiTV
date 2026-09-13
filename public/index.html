@@ -34,6 +34,15 @@
         <button class="secondary" id="friendsToggle">👥 FRIENDS</button>
       </div>
 
+      <div id="leaderPanel" class="leaderPanel hiddenPanel">
+        <div class="leaderHead"><h3>🏆 Leaderboards</h3><span class="tiny">Top 20</span></div>
+        <div class="leaderboards">
+          <div class="leaderTable"><h4>😀 Emoji Face-Off</h4><div id="faceLeaderboard"><div class="leaderEmpty">No completed games yet.</div></div></div>
+          <div class="leaderTable"><h4>🧻 Emoji Hunt</h4><div id="huntLeaderboard"><div class="leaderEmpty">No completed games yet.</div></div></div>
+          <div class="leaderTable"><h4>📹 Video Chat</h4><div id="chatLeaderboard"><div class="leaderEmpty">No chat sessions yet.</div></div></div>
+        </div>
+      </div>
+
       <div class="emoji">🎮</div>
       <h1>Choose Your Game</h1>
       <p>Play against a random person with your camera. Pick a mode and jump in.</p>
@@ -56,16 +65,6 @@
         <div class="chatRow"><input id="friendSearchInput" maxlength="20" placeholder="Search username"><button class="primary" id="friendSearchButton">ADD FRIEND</button></div>
         <div id="friendSearchResult" class="tiny"></div>
       </div>
-
-      <div id="leaderPanel" class="leaderPanel hiddenPanel">
-        <div class="leaderHead"><h3>🏆 Leaderboards</h3><span class="tiny">Top 20</span></div>
-        <div class="leaderboards">
-          <div class="leaderTable"><h4>😀 Emoji Face-Off</h4><div id="faceLeaderboard"><div class="leaderEmpty">No completed games yet.</div></div></div>
-          <div class="leaderTable"><h4>🧻 Emoji Hunt</h4><div id="huntLeaderboard"><div class="leaderEmpty">No completed games yet.</div></div></div>
-          <div class="leaderTable"><h4>📹 Video Chat</h4><div id="chatLeaderboard"><div class="leaderEmpty">No chat sessions yet.</div></div></div>
-        </div>
-      </div>
-
       <div class="dashboardShare"><button class="secondary" id="dashboardShare">📤 SHARE</button></div>
       <div class="tiny" style="margin-top:18px">Random matchmaking • Camera & microphone required</div>
     </div>  </div>
@@ -189,7 +188,33 @@ function saveNameAndContinue(){setUsername($("usernameInput").value);hideNameGat
 function show(name){screens.forEach(x=>$(x).classList.toggle("active",x===name));}
 function clearError(){$("error").textContent="";$('error').classList.remove("show");$('retry').style.display="none";}
 function setError(t){$('error').textContent=t;$('error').classList.add('show');$('retry').style.display='inline-block';}
-function closeConnection(){if(ws){try{ws.close()}catch{}ws=null}if(pc){try{pc.close()}catch{}pc=null;}}
+function closeConnection(){if(ws){try{ws.onclose=null;ws.onerror=null;ws.close()}catch{}ws=null}if(pc){try{pc.close()}catch{}pc=null;}}
+function reconnectAfterOpponentLeft(){
+  roundToken++;
+  stopFaceScoring();
+  huntScanning=false;
+  stopHuntTimer();
+  if(pc){try{pc.close()}catch{}pc=null;}
+  ["remoteFace","remoteChat","remoteHunt","remoteWaiting"].forEach(id=>{if($(id))$(id).srcObject=null;});
+  const mode=currentMode;
+  if(!mode)return;
+  closeConnection();
+  opponentUsername="PLAYER";
+  updateOpponentLabels();
+  show("match");
+  $("matchTitle").textContent=mode==="face"?"Finding a new Emoji Face-Off opponent…":mode==="hunt"?"Finding a new Emoji Hunt opponent…":"Finding a new video chat partner…";
+  $("matchStatus").textContent="Opponent disconnected. Finding someone new…";
+  $("connection").textContent="Searching…";
+  setTimeout(()=>{
+    if(currentMode!==mode)return;
+    connectToServer().catch(()=>{
+      if(currentMode===mode){
+        $("matchStatus").textContent="Could not reconnect. Trying again…";
+        setTimeout(()=>{if(currentMode===mode)reconnectAfterOpponentLeft();},1500);
+      }
+    });
+  },900);
+}
 function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}[
 "localWaiting","localFace","remoteWaiting","remoteFace","localChat","remoteChat","localHunt","remoteHunt"
 ].forEach(id=>{if($(id))$(id).srcObject=null});}
@@ -341,7 +366,7 @@ async function connectToServer(){
       if(m.type==="dm-history"&&m.with===dmWith)renderDmHistory(m.messages);
       if(m.type==="dm"&&m.from===dmWith)appendDm(m);
       if(m.type==="chat-message"){const div=document.createElement("div");div.className="msg"+(m.self?" self":"");div.textContent=(m.self?"You: ":"Them: ")+m.text;$('messages').appendChild(div);$('messages').scrollTop=$('messages').scrollHeight;}
-      if(m.type==="report-result"){if(m.ok){$("reportSuccess").textContent=`Report submitted ✓ Reference: ${m.reportId.slice(0,8)}`;$("reportSuccess").classList.add("show");setTimeout(closeReport,1400);}else{$("reportSuccess").textContent=m.error||"Could not submit report.";$("reportSuccess").classList.add("show");}}if(m.type==="opponent-left"){const mode=currentMode;closeConnection();$('matchStatus').textContent="Player left. Finding someone new…";show("match");connectToServer().catch(()=>{});}
+      if(m.type==="report-result"){if(m.ok){$("reportSuccess").textContent=`Report submitted ✓ Reference: ${m.reportId.slice(0,8)}`;$("reportSuccess").classList.add("show");setTimeout(closeReport,1400);}else{$("reportSuccess").textContent=m.error||"Could not submit report.";$("reportSuccess").classList.add("show");}}if(m.type==="opponent-left"){reconnectAfterOpponentLeft();}
       if(m.type==="ready"){ws.__playerId=m.playerId;ws.send(JSON.stringify({type:"set-username",username}));requestLeaderboards();}
       if(m.type==="online-list")renderOnline(m);
       if(m.type==="username-saved"){setUsername(m.username);}
