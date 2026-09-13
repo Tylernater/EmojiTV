@@ -44,106 +44,26 @@ const EMOJIS = [
 ];
 
 const HUNT_ITEMS = [
-  {
-    emoji: "🧻",
-    label: "toilet paper",
-    aliases: ["toilet paper", "a roll of toilet paper"]
-  },
-  {
-    emoji: "🍎",
-    label: "apple",
-    aliases: ["an apple", "a red apple", "apple"]
-  },
-  {
-    emoji: "🍌",
-    label: "banana",
-    aliases: ["a banana", "banana"]
-  },
-  {
-    emoji: "🥤",
-    label: "cup",
-    aliases: ["a cup", "a drinking cup", "plastic cup"]
-  },
-  {
-    emoji: "🧴",
-    label: "bottle",
-    aliases: ["a bottle", "a plastic bottle", "water bottle"]
-  },
-  {
-    emoji: "📕",
-    label: "book",
-    aliases: ["a book", "a red book"]
-  },
-  {
-    emoji: "🥄",
-    label: "spoon",
-    aliases: ["a spoon", "a metal spoon"]
-  },
-  {
-    emoji: "🧸",
-    label: "teddy bear",
-    aliases: ["a teddy bear", "a stuffed bear", "stuffed animal"]
-  },
-  {
-    emoji: "📱",
-    label: "cell phone",
-    aliases: ["a cell phone", "a smartphone", "a phone"]
-  },
-  {
-    emoji: "🪥",
-    label: "toothbrush",
-    aliases: ["a toothbrush", "toothbrush"]
-  },
-  {
-    emoji: "🎧",
-    label: "headphones",
-    aliases: ["headphones", "a pair of headphones"]
-  },
-  {
-    emoji: "🕶️",
-    label: "sunglasses",
-    aliases: ["sunglasses", "a pair of sunglasses"]
-  },
-  {
-    emoji: "⚽",
-    label: "soccer ball",
-    aliases: ["a soccer ball", "soccer ball"]
-  },
-  {
-    emoji: "🏀",
-    label: "basketball",
-    aliases: ["a basketball", "basketball"]
-  },
-  {
-    emoji: "🎮",
-    label: "game controller",
-    aliases: ["a game controller", "controller"]
-  },
-  {
-    emoji: "⌚",
-    label: "watch",
-    aliases: ["a watch", "smartwatch"]
-  },
-  {
-    emoji: "✏️",
-    label: "pencil",
-    aliases: ["a pencil", "pencil"]
-  },
-  {
-    emoji: "🖊️",
-    label: "pen",
-    aliases: ["a pen", "pen"]
-  },
-  {
-    emoji: "🧢",
-    label: "cap",
-    aliases: ["a cap", "a baseball cap", "hat"]
-  },
-  {
-    emoji: "👟",
-    label: "shoe",
-    aliases: ["a shoe", "sneaker"]
-  }
+  { emoji:"🧻", label:"toilet paper", aliases:["toilet paper","a roll of toilet paper"] },
+  { emoji:"🍎", label:"apple", aliases:["an apple","a red apple","apple"] },
+  { emoji:"🍌", label:"banana", aliases:["a banana","banana"] },
+  { emoji:"🥤", label:"cup", aliases:["a cup","a drinking cup","plastic cup"] },
+  { emoji:"🧴", label:"bottle", aliases:["a bottle","a plastic bottle","water bottle"] },
+  { emoji:"📕", label:"book", aliases:["a book","a red book"] },
+  { emoji:"🥄", label:"spoon", aliases:["a spoon","a metal spoon"] },
+  { emoji:"🧸", label:"teddy bear", aliases:["a teddy bear","a stuffed bear","stuffed animal"] },
+  { emoji:"📱", label:"cell phone", aliases:["a cell phone","a smartphone","a phone"] },
+  { emoji:"🪥", label:"toothbrush", aliases:["a toothbrush","toothbrush"] },
+  { emoji:"🎧", label:"headphones", aliases:["headphones","a pair of headphones"] },
+  { emoji:"🕶️", label:"sunglasses", aliases:["sunglasses","a pair of sunglasses"] },
+  { emoji:"⚽", label:"soccer ball", aliases:["a soccer ball","soccer ball"] },
+  { emoji:"🏀", label:"basketball", aliases:["a basketball","basketball"] },
+  { emoji:"🎮", label:"game controller", aliases:["a game controller","controller"] },
+  { emoji:"⌚", label:"watch", aliases:["a watch","smartwatch"] },
+  { emoji:"✏️", label:"pencil", aliases:["a pencil","pencil"] },
+  { emoji:"🖊️", label:"pen", aliases:["a pen","pen"] },
+  { emoji:"🧢", label:"cap", aliases:["a cap","a baseball cap","hat"] },
+  { emoji:"👟", label:"shoe", aliases:["a shoe","sneaker"] }
 ];
 
 const TOTAL_FACE_ROUNDS = 5;
@@ -151,6 +71,12 @@ const TOTAL_HUNT_ROUNDS = 10;
 
 const HUNT_SECONDS = 60;
 const HUNT_TIMEOUT_MS = HUNT_SECONDS * 1000;
+
+/*
+  How long we wait before deciding that a disconnected
+  player really has lost their WebSocket connection.
+*/
+const DISCONNECT_GRACE_MS = 2500;
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -163,7 +89,9 @@ app.get("/health", (_, res) => {
 
 function send(ws, data) {
   if (ws && ws.readyState === 1) {
-    ws.send(JSON.stringify(data));
+    try {
+      ws.send(JSON.stringify(data));
+    } catch {}
   }
 }
 
@@ -192,6 +120,8 @@ function removeFromWaiting(ws) {
   if (index !== -1) {
     waiting.splice(index, 1);
   }
+
+  ws.queueMode = null;
 }
 
 function randomItem(list) {
@@ -435,7 +365,14 @@ function broadcastLeaderboards() {
   }
 }
 
-function endRoom(ws, notifyOpponent = true) {
+/*
+  End a room because a player left.
+
+  The important part here is that the remaining player
+  gets a special "opponent-disconnected" message.
+  The client can then automatically search again.
+*/
+function endRoom(ws, notifyOpponent = true, reason = "left") {
   removeFromWaiting(ws);
 
   if (!ws.roomId) {
@@ -489,21 +426,31 @@ function endRoom(ws, notifyOpponent = true) {
     broadcastLeaderboards();
   }
 
+  /*
+    Only notify the opponent if they are still connected.
+    This is the message the client uses to automatically
+    start looking for another player.
+  */
   if (
     opponent &&
-    notifyOpponent
+    notifyOpponent &&
+    opponent.readyState === 1
   ) {
     send(opponent, {
-      type: "opponent-left"
+      type: "opponent-disconnected",
+      reason,
+      opponentUsername: ws.username
     });
   }
 
   if (room.a) {
     room.a.roomId = null;
+    room.a.role = null;
   }
 
   if (room.b) {
     room.b.roomId = null;
+    room.b.role = null;
   }
 
   rooms.delete(roomId);
@@ -534,7 +481,8 @@ function findWaitingOpponent(mode) {
 
     if (
       candidate.readyState === 1 &&
-      candidate.queueMode === mode
+      candidate.queueMode === mode &&
+      !candidate.roomId
     ) {
       waiting.splice(i, 1);
       candidate.queueMode = null;
@@ -566,6 +514,7 @@ function scheduleHuntTimeout(room) {
     }
 
     room.huntFound = true;
+    room.huntTimer = null;
 
     send(room.a, {
       type: "hunt-timeout",
@@ -586,15 +535,48 @@ function startMatch(
   playerB,
   mode
 ) {
+  /*
+    Never match a player who has already disconnected
+    or entered another room.
+  */
+  if (
+    !playerA ||
+    !playerB ||
+    playerA.readyState !== 1 ||
+    playerB.readyState !== 1 ||
+    playerA.roomId ||
+    playerB.roomId
+  ) {
+    if (
+      playerA &&
+      playerA.readyState === 1 &&
+      !playerA.roomId
+    ) {
+      putInQueue(playerA, mode);
+    }
+
+    if (
+      playerB &&
+      playerB.readyState === 1 &&
+      !playerB.roomId
+    ) {
+      putInQueue(playerB, mode);
+    }
+
+    return;
+  }
+
   const roomId = createId();
+
+  const usedTargets = new Set();
 
   const target =
     mode === "hunt"
-      ? nextHuntTarget(new Set())
+      ? nextHuntTarget(usedTargets)
       : mode === "face"
         ? nextUnique(
             EMOJIS,
-            new Set()
+            usedTargets
           )
         : null;
 
@@ -613,11 +595,7 @@ function startMatch(
 
     target,
 
-    usedTargets: new Set(
-      target
-        ? [target.emoji || target]
-        : []
-    ),
+    usedTargets,
 
     scores: {
       [playerA.playerId]: 0,
@@ -736,6 +714,18 @@ wss.on("connection", ws => {
   ws.role = null;
   ws.queueMode = null;
   ws.username = "Guest";
+  ws.isAlive = true;
+  ws.disconnectTimer = null;
+
+  /*
+    WebSocket heartbeat.
+
+    This lets the server detect connections that appear
+    open but whose internet connection has actually died.
+  */
+  ws.on("pong", () => {
+    ws.isAlive = true;
+  });
 
   send(ws, {
     type: "ready",
@@ -748,6 +738,11 @@ wss.on("connection", ws => {
   broadcastOnline();
 
   ws.on("message", raw => {
+    /*
+      Any message proves the connection is alive.
+    */
+    ws.isAlive = true;
+
     let message;
 
     try {
@@ -807,7 +802,8 @@ wss.on("connection", ws => {
         ...clients
       ].find(
         client =>
-          client.username === to
+          client.username === to &&
+          client.readyState === 1
       );
 
       if (!target) {
@@ -934,7 +930,8 @@ wss.on("connection", ws => {
         ...clients
       ].find(
         client =>
-          client.username === to
+          client.username === to &&
+          client.readyState === 1
       );
 
       if (!target) {
@@ -1030,7 +1027,8 @@ wss.on("connection", ws => {
       ].find(
         client =>
           client.username ===
-          invite.from
+          invite.from &&
+          client.readyState === 1
       );
 
       if (sender) {
@@ -1087,7 +1085,8 @@ wss.on("connection", ws => {
       ].find(
         client =>
           client.username ===
-          invite.from
+          invite.from &&
+          client.readyState === 1
       );
 
       if (
@@ -1350,6 +1349,18 @@ wss.on("connection", ws => {
         );
       }
 
+      /*
+        If this player was in a previous room,
+        clean that room up before matchmaking again.
+      */
+      if (ws.roomId) {
+        endRoom(
+          ws,
+          true,
+          "rematch"
+        );
+      }
+
       removeFromWaiting(ws);
 
       const opponent =
@@ -1373,12 +1384,22 @@ wss.on("connection", ws => {
       return;
     }
 
+    /*
+      SKIP THE CURRENT OPPONENT.
+
+      The player immediately leaves the current room
+      and goes back into the same game-mode queue.
+    */
     if (message.type === "skip") {
       const oldMode = ws.roomId
         ? rooms.get(ws.roomId)?.mode
         : ws.queueMode;
 
-      endRoom(ws, true);
+      endRoom(
+        ws,
+        true,
+        "skipped"
+      );
 
       if (oldMode) {
         putInQueue(
@@ -1393,7 +1414,11 @@ wss.on("connection", ws => {
     }
 
     if (message.type === "leave") {
-      endRoom(ws, true);
+      endRoom(
+        ws,
+        true,
+        "left"
+      );
 
       broadcastOnline();
 
@@ -1772,12 +1797,35 @@ wss.on("connection", ws => {
     }
   });
 
+  ws.on("error", error => {
+    console.log(
+      "EmojiTV WebSocket error:",
+      error?.message || error
+    );
+  });
+
   ws.on("close", () => {
     clients.delete(ws);
 
-    removeFromWaiting(ws);
+    if (ws.disconnectTimer) {
+      clearTimeout(
+        ws.disconnectTimer
+      );
 
-    endRoom(ws, true);
+      ws.disconnectTimer = null;
+    }
+
+    /*
+      Tell the opponent immediately when the actual
+      WebSocket connection closes.
+    */
+    endRoom(
+      ws,
+      true,
+      "disconnected"
+    );
+
+    removeFromWaiting(ws);
 
     for (
       const [
@@ -1806,6 +1854,46 @@ wss.on("connection", ws => {
       sendFriends(name);
     }
   });
+});
+
+/*
+  HEARTBEAT
+
+  Every 20 seconds we ping every connection.
+
+  If a client doesn't answer the previous ping,
+  we terminate the connection. That triggers the
+  close handler above, which tells their opponent
+  that they disconnected.
+*/
+const heartbeat = setInterval(() => {
+  for (const ws of clients) {
+    if (ws.isAlive === false) {
+      console.log(
+        `EmojiTV: terminating dead connection for ${ws.username}`
+      );
+
+      try {
+        ws.terminate();
+      } catch {}
+
+      continue;
+    }
+
+    ws.isAlive = false;
+
+    try {
+      ws.ping();
+    } catch {
+      try {
+        ws.terminate();
+      } catch {}
+    }
+  }
+}, 20000);
+
+wss.on("close", () => {
+  clearInterval(heartbeat);
 });
 
 const PORT =
