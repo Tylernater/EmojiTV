@@ -25,6 +25,17 @@ const clients = new Set();
 const rooms = new Map();
 const sessions = new Map();
 
+/*
+==========================================================
+WAITING QUEUES
+
+These are completely independent from the Friends system.
+
+A player does NOT need to be friends with another player
+to enter one of these queues.
+==========================================================
+*/
+
 const waiting = {
   face: [],
   chat: [],
@@ -32,6 +43,12 @@ const waiting = {
   pose: [],
   laugh: []
 };
+
+/*
+==========================================================
+USER DATA
+==========================================================
+*/
 
 const users = new Map();
 
@@ -51,15 +68,19 @@ const badges = [
   "100 Games"
 ];
 
-function safeSend(ws, data) {
-  if (!ws) return;
+/*
+==========================================================
+HELPERS
+==========================================================
+*/
 
-  if (ws.readyState === 1) {
-    try {
-      ws.send(JSON.stringify(data));
-    } catch (err) {
-      console.warn("Send error:", err.message);
-    }
+function safeSend(ws, data) {
+  if (!ws || ws.readyState !== 1) return;
+
+  try {
+    ws.send(JSON.stringify(data));
+  } catch (error) {
+    console.warn("WebSocket send error:", error.message);
   }
 }
 
@@ -70,10 +91,12 @@ function makeId() {
 function cleanUsername(name) {
   if (!name) return "Player";
 
-  return String(name)
-    .replace(/[<>]/g, "")
-    .trim()
-    .slice(0, 20) || "Player";
+  return (
+    String(name)
+      .replace(/[<>]/g, "")
+      .trim()
+      .slice(0, 20) || "Player"
+  );
 }
 
 function getUser(username) {
@@ -124,15 +147,29 @@ function getClientByPlayerId(playerId) {
   return null;
 }
 
-function otherPlayer(room, playerId) {
+function getPlayerById(room, playerId) {
   if (!room) return null;
 
-  return room.players.find(
-    player => player.playerId !== playerId
-  ) || null;
+  return (
+    room.players.find(
+      player => player.playerId === playerId
+    ) || null
+  );
 }
 
-function roomForPlayer(playerId) {
+function getOpponent(room, playerId) {
+  if (!room) return null;
+
+  return (
+    room.players.find(
+      player => player.playerId !== playerId
+    ) || null
+  );
+}
+
+function getRoomForPlayer(playerId) {
+  if (!playerId) return null;
+
   for (const room of rooms.values()) {
     if (
       room.players.some(
@@ -146,11 +183,11 @@ function roomForPlayer(playerId) {
   return null;
 }
 
-function getRoomPlayer(room, playerId) {
-  return room?.players.find(
-    player => player.playerId === playerId
-  ) || null;
-}
+/*
+==========================================================
+ROOM STATE
+==========================================================
+*/
 
 function sendRoomState(room) {
   if (!room) return;
@@ -160,37 +197,82 @@ function sendRoomState(room) {
 
     if (!ws) continue;
 
-    const opponent = otherPlayer(room, player.playerId);
+    const opponent = getOpponent(
+      room,
+      player.playerId
+    );
 
     safeSend(ws, {
       type: "room-state",
+
       roomId: room.roomId,
+
       playerId: player.playerId,
+
       mode: room.mode,
+
       role: player.role,
+
       username: player.username,
-      opponentUsername: opponent?.username || "Waiting...",
+
+      opponentUsername:
+        opponent?.username || "Waiting...",
+
       target: room.target || null,
-      score: room.scores[player.playerId] || 0,
-      opponentScore: opponent
-        ? room.scores[opponent.playerId] || 0
-        : 0,
+
+      score:
+        room.scores[player.playerId] || 0,
+
+      opponentScore:
+        opponent
+          ? room.scores[opponent.playerId] || 0
+          : 0,
+
       started: room.started,
+
       round: room.round || 1
     });
   }
 }
 
+/*
+==========================================================
+WAITING QUEUE MANAGEMENT
+==========================================================
+*/
+
 function removeFromWaiting(ws) {
   for (const mode of Object.keys(waiting)) {
     waiting[mode] = waiting[mode].filter(
-      item => item.ws !== ws
+      entry => entry.ws !== ws
     );
   }
 }
 
+function cleanWaitingQueues() {
+  for (const mode of Object.keys(waiting)) {
+    waiting[mode] = waiting[mode].filter(entry => {
+      return (
+        entry.ws &&
+        entry.ws.readyState === 1 &&
+        !entry.ws.__roomId
+      );
+    });
+  }
+}
+
+/*
+==========================================================
+SESSION MANAGEMENT
+
+Sessions allow a player to reconnect after a temporary
+connection/Wi-Fi problem without immediately destroying
+the game room.
+==========================================================
+*/
+
 function saveSession(room, player) {
-  if (!player?.sessionId) return;
+  if (!room || !player?.sessionId) return;
 
   sessions.set(player.sessionId, {
     roomId: room.roomId,
@@ -212,44 +294,82 @@ function restoreSession(ws, sessionId) {
     return false;
   }
 
-  const player = getRoomPlayer(room, session.playerId);
+  const player = getPlayerById(
+    room,
+    session.playerId
+  );
 
   if (!player) {
     sessions.delete(sessionId);
     return false;
   }
 
+  /*
+  Replace the old WebSocket connection with
+  the player's new connection.
+  */
+
   player.ws = ws;
+
   ws.__playerId = player.playerId;
   ws.__roomId = room.roomId;
   ws.__sessionId = sessionId;
   ws.__username = player.username;
 
-  sendRoomState(room);
-
-  const opponent = otherPlayer(room, player.playerId);
-
-  if (opponent) {
-    const opponentWs = getClientByPlayerId(
-      opponent.playerId
-    );
-
-    safeSend(opponentWs, {
-      type: "session-restored",
-      playerId: player.playerId,
-      opponentUsername: player.username
-    });
-  }
+  saveSession(room, player);
 
   safeSend(ws, {
     type: "session-restored",
+
     playerId: player.playerId,
+
     roomId: room.roomId,
-    opponentUsername: opponent?.username || "Waiting..."
+
+    mode: room.mode,
+
+    role: player.role,
+
+    opponentUsername:
+      getOpponent(room, player.playerId)
+        ?.username || "Waiting..."
   });
+
+  sendRoomState(room);
+
+  const opponent = getOpponent(
+    room,
+    player.playerId
+  );
+
+  if (opponent) {
+    const opponentWs =
+      getClientByPlayerId(
+        opponent.playerId
+      );
+
+    safeSend(opponentWs, {
+      type: "opponent-reconnected",
+
+      opponentUsername:
+        player.username,
+
+      playerId:
+        player.playerId
+    });
+  }
 
   return true;
 }
+
+/*
+==========================================================
+ROOM ENDING
+
+A room is ended ONLY when someone deliberately leaves,
+or when the game itself finishes.
+A temporary WebSocket disconnect does NOT end the room.
+==========================================================
+*/
 
 function endRoom(room, reason = "ended") {
   if (!room) return;
@@ -261,7 +381,10 @@ function endRoom(room, reason = "ended") {
       sessions.delete(player.sessionId);
     }
 
-    const ws = player.ws;
+    const ws =
+      getClientByPlayerId(
+        player.playerId
+      );
 
     if (ws) {
       ws.__roomId = null;
@@ -274,12 +397,20 @@ function endRoom(room, reason = "ended") {
   }
 }
 
+/*
+==========================================================
+PROGRESS
+==========================================================
+*/
+
 function addXP(username, amount) {
   const user = getUser(username);
 
   user.xp += amount;
 
-  while (user.xp >= user.level * 500) {
+  while (
+    user.xp >= user.level * 500
+  ) {
     user.xp -= user.level * 500;
     user.level++;
   }
@@ -294,7 +425,9 @@ function recordGame(username, won) {
 
   if (won) {
     user.wins++;
+
     user.streak++;
+
     user.bestStreak = Math.max(
       user.bestStreak,
       user.streak
@@ -303,236 +436,511 @@ function recordGame(username, won) {
     addXP(username, 100);
   } else {
     user.losses++;
+
     user.streak = 0;
+
     addXP(username, 25);
   }
 
   return user;
 }
 
-function createRoom(mode, a, b) {
+/*
+==========================================================
+ROOM CREATION
+
+This is the important part for RANDOM MATCHMAKING.
+
+Player A and Player B can be complete strangers.
+
+No friend relationship is checked here.
+==========================================================
+*/
+
+function createRoom(mode, first, second) {
   const roomId = makeId();
 
   const playerA = {
     playerId: makeId(),
-    ws: a.ws,
-    username: a.username,
-    sessionId: a.sessionId,
+
+    ws: first.ws,
+
+    username: first.username,
+
+    sessionId: first.sessionId,
+
     role: "a"
   };
 
   const playerB = {
     playerId: makeId(),
-    ws: b.ws,
-    username: b.username,
-    sessionId: b.sessionId,
+
+    ws: second.ws,
+
+    username: second.username,
+
+    sessionId: second.sessionId,
+
     role: "b"
   };
 
   const room = {
     roomId,
+
     mode,
-    players: [playerA, playerB],
+
+    players: [
+      playerA,
+      playerB
+    ],
+
     started: true,
+
     target: null,
+
     scores: {
       [playerA.playerId]: 0,
       [playerB.playerId]: 0
     },
+
     round: 1,
+
     createdAt: Date.now()
   };
 
-  rooms.set(roomId, room);
+  rooms.set(
+    roomId,
+    room
+  );
 
-  a.ws.__playerId = playerA.playerId;
-  a.ws.__roomId = roomId;
-  a.ws.__sessionId = a.sessionId;
+  first.ws.__playerId =
+    playerA.playerId;
 
-  b.ws.__playerId = playerB.playerId;
-  b.ws.__roomId = roomId;
-  b.ws.__sessionId = b.sessionId;
+  first.ws.__roomId =
+    roomId;
 
-  saveSession(room, playerA);
-  saveSession(room, playerB);
+  first.ws.__sessionId =
+    first.sessionId;
+
+  second.ws.__playerId =
+    playerB.playerId;
+
+  second.ws.__roomId =
+    roomId;
+
+  second.ws.__sessionId =
+    second.sessionId;
+
+  saveSession(
+    room,
+    playerA
+  );
+
+  saveSession(
+    room,
+    playerB
+  );
 
   return room;
 }
 
-function startMatch(mode, ws, username, sessionId) {
+/*
+==========================================================
+RANDOM MATCHMAKING
+
+The player chooses a game mode.
+
+They are placed into that mode's waiting queue.
+
+The next RANDOM PLAYER who chooses the same mode
+gets matched with them.
+
+FRIENDS ARE NOT INVOLVED.
+==========================================================
+*/
+
+function startMatch(
+  mode,
+  ws,
+  username,
+  sessionId
+) {
   if (!waiting[mode]) {
     safeSend(ws, {
       type: "error",
-      message: "Unknown game mode."
+
+      message:
+        "That game mode is not available."
     });
 
     return;
   }
 
-  removeFromWaiting(ws);
+  /*
+  If the player is already in a room,
+  don't create another room.
+  */
 
-  const existingRoom = roomForPlayer(ws.__playerId);
-
-  if (existingRoom) {
-    ws.__roomId = existingRoom.roomId;
-
-    const player = getRoomPlayer(
-      existingRoom,
+  const existingRoom =
+    getRoomForPlayer(
       ws.__playerId
     );
 
-    if (player) {
-      player.ws = ws;
-      player.username = username;
-      player.sessionId = sessionId;
+  if (existingRoom) {
+    const existingPlayer =
+      getPlayerById(
+        existingRoom,
+        ws.__playerId
+      );
 
-      saveSession(existingRoom, player);
+    if (existingPlayer) {
+      existingPlayer.ws = ws;
+
+      existingPlayer.username =
+        username;
+
+      existingPlayer.sessionId =
+        sessionId;
+
+      ws.__roomId =
+        existingRoom.roomId;
+
+      ws.__sessionId =
+        sessionId;
+
+      saveSession(
+        existingRoom,
+        existingPlayer
+      );
     }
 
-    sendRoomState(existingRoom);
+    sendRoomState(
+      existingRoom
+    );
+
     return;
   }
 
-  const possibleOpponent = waiting[mode].find(
-    item =>
-      item.ws !== ws &&
-      item.ws.readyState === 1
-  );
+  /*
+  Remove this WebSocket from any previous queue.
+  */
 
-  if (possibleOpponent) {
-    waiting[mode] = waiting[mode].filter(
-      item => item !== possibleOpponent
-    );
+  removeFromWaiting(ws);
 
-    const room = createRoom(
-      mode,
-      {
-        ws: possibleOpponent.ws,
-        username: possibleOpponent.username,
-        sessionId: possibleOpponent.sessionId
-      },
-      {
-        ws,
-        username,
-        sessionId
-      }
-    );
+  cleanWaitingQueues();
 
-    safeSend(possibleOpponent.ws, {
-      type: "match-found",
-      roomId: room.roomId,
-      mode,
-      playerId: room.players[0].playerId,
-      role: "a",
-      opponentUsername: username
+  /*
+  Find ANY available random player
+  waiting for this exact game mode.
+  */
+
+  let opponentIndex = -1;
+
+  for (
+    let i = 0;
+    i < waiting[mode].length;
+    i++
+  ) {
+    const entry =
+      waiting[mode][i];
+
+    if (
+      entry.ws &&
+      entry.ws !== ws &&
+      entry.ws.readyState === 1 &&
+      !entry.ws.__roomId
+    ) {
+      opponentIndex = i;
+      break;
+    }
+  }
+
+  /*
+  NO RANDOM OPPONENT YET:
+  put this player into the queue.
+  */
+
+  if (opponentIndex === -1) {
+    waiting[mode].push({
+      ws,
+
+      username,
+
+      sessionId
     });
 
     safeSend(ws, {
-      type: "match-found",
-      roomId: room.roomId,
-      mode,
-      playerId: room.players[1].playerId,
-      role: "b",
-      opponentUsername: possibleOpponent.username
-    });
+      type: "waiting",
 
-    sendRoomState(room);
+      mode,
+
+      message:
+        "Waiting for a random opponent..."
+    });
 
     return;
   }
 
-  waiting[mode].push({
-    ws,
-    username,
-    sessionId
-  });
+  /*
+  RANDOM OPPONENT FOUND.
+  */
 
-  safeSend(ws, {
-    type: "waiting",
-    mode
-  });
+  const opponent =
+    waiting[mode].splice(
+      opponentIndex,
+      1
+    )[0];
+
+  /*
+  Double-check that the opponent is still usable.
+  */
+
+  if (
+    !opponent ||
+    !opponent.ws ||
+    opponent.ws.readyState !== 1 ||
+    opponent.ws.__roomId
+  ) {
+    return startMatch(
+      mode,
+      ws,
+      username,
+      sessionId
+    );
+  }
+
+  /*
+  CREATE THE GAME ROOM.
+  */
+
+  const room = createRoom(
+    mode,
+
+    {
+      ws: opponent.ws,
+
+      username:
+        opponent.username,
+
+      sessionId:
+        opponent.sessionId
+    },
+
+    {
+      ws,
+
+      username,
+
+      sessionId
+    }
+  );
+
+  /*
+  Tell Player A they found a random opponent.
+  */
+
+  safeSend(
+    opponent.ws,
+    {
+      type: "match-found",
+
+      roomId:
+        room.roomId,
+
+      mode,
+
+      playerId:
+        room.players[0].playerId,
+
+      role: "a",
+
+      opponentUsername:
+        username
+    }
+  );
+
+  /*
+  Tell Player B they found a random opponent.
+  */
+
+  safeSend(
+    ws,
+    {
+      type: "match-found",
+
+      roomId:
+        room.roomId,
+
+      mode,
+
+      playerId:
+        room.players[1].playerId,
+
+      role: "b",
+
+      opponentUsername:
+        opponent.username
+    }
+  );
+
+  /*
+  Send the complete room state to both players.
+  */
+
+  sendRoomState(room);
 }
+
+/*
+==========================================================
+WEBSOCKET CONNECTION
+==========================================================
+*/
 
 wss.on("connection", ws => {
   clients.add(ws);
 
   ws.__playerId = null;
+
   ws.__roomId = null;
+
   ws.__sessionId = null;
+
   ws.__username = "Player";
 
   safeSend(ws, {
     type: "connected"
   });
 
+  /*
+  ========================================================
+  MESSAGE HANDLER
+  ========================================================
+  */
+
   ws.on("message", raw => {
     let message;
 
     try {
-      message = JSON.parse(raw.toString());
+      message =
+        JSON.parse(
+          raw.toString()
+        );
     } catch {
       safeSend(ws, {
         type: "error",
-        message: "Invalid message."
+
+        message:
+          "Invalid server message."
       });
 
       return;
     }
 
-    const type = message.type;
+    const type =
+      message.type;
 
-    if (type === "set-username") {
-      const username = cleanUsername(message.username);
+    /*
+    ======================================================
+    SET USERNAME
+    ======================================================
+    */
+
+    if (
+      type ===
+      "set-username"
+    ) {
+      const username =
+        cleanUsername(
+          message.username
+        );
+
       const sessionId =
-        message.sessionId || makeId();
+        message.sessionId ||
+        makeId();
 
-      ws.__username = username;
-      ws.__sessionId = sessionId;
+      ws.__username =
+        username;
 
-      const restored = restoreSession(
-        ws,
-        sessionId
-      );
+      ws.__sessionId =
+        sessionId;
+
+      /*
+      Try restoring an old game first.
+      */
+
+      const restored =
+        restoreSession(
+          ws,
+          sessionId
+        );
 
       if (!restored) {
-        ws.__playerId = ws.__playerId || makeId();
+        ws.__playerId =
+          ws.__playerId ||
+          makeId();
 
         getUser(username);
 
         safeSend(ws, {
-          type: "username-set",
+          type:
+            "username-set",
+
           username,
+
           sessionId,
-          playerId: ws.__playerId
+
+          playerId:
+            ws.__playerId
         });
       } else {
         safeSend(ws, {
-          type: "username-set",
+          type:
+            "username-set",
+
           username,
+
           sessionId,
-          playerId: ws.__playerId
+
+          playerId:
+            ws.__playerId
         });
       }
 
       return;
     }
 
-    if (type === "find-match") {
-      const mode = String(
-        message.mode || "face"
-      ).toLowerCase();
+    /*
+    ======================================================
+    FIND RANDOM MATCH
+    ======================================================
+    */
 
-      const username = cleanUsername(
-        message.username || ws.__username
-      );
+    if (
+      type ===
+      "find-match"
+    ) {
+      const mode =
+        String(
+          message.mode ||
+          "face"
+        ).toLowerCase();
+
+      const username =
+        cleanUsername(
+          message.username ||
+          ws.__username
+        );
 
       const sessionId =
         message.sessionId ||
         ws.__sessionId ||
         makeId();
 
-      ws.__username = username;
-      ws.__sessionId = sessionId;
+      ws.__username =
+        username;
+
+      ws.__sessionId =
+        sessionId;
 
       getUser(username);
 
@@ -546,27 +954,43 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (type === "leave") {
+    /*
+    ======================================================
+    LEAVE GAME
+    ======================================================
+    */
+
+    if (
+      type ===
+      "leave"
+    ) {
       removeFromWaiting(ws);
 
-      const room = rooms.get(ws.__roomId);
-
-      if (room) {
-        const player = getRoomPlayer(
-          room,
-          ws.__playerId
+      const room =
+        rooms.get(
+          ws.__roomId
         );
 
-        if (player?.sessionId) {
+      if (room) {
+        const player =
+          getPlayerById(
+            room,
+            ws.__playerId
+          );
+
+        if (
+          player?.sessionId
+        ) {
           sessions.delete(
             player.sessionId
           );
         }
 
-        const opponent = otherPlayer(
-          room,
-          ws.__playerId
-        );
+        const opponent =
+          getOpponent(
+            room,
+            ws.__playerId
+          );
 
         if (opponent) {
           const opponentWs =
@@ -574,12 +998,19 @@ wss.on("connection", ws => {
               opponent.playerId
             );
 
-          safeSend(opponentWs, {
-            type: "opponent-left"
-          });
+          safeSend(
+            opponentWs,
+            {
+              type:
+                "opponent-left"
+            }
+          );
         }
 
-        endRoom(room, "left");
+        endRoom(
+          room,
+          "left"
+        );
       }
 
       ws.__roomId = null;
@@ -591,17 +1022,105 @@ wss.on("connection", ws => {
       return;
     }
 
-    if (type === "signal") {
-      const room = rooms.get(
-        ws.__roomId
+    /*
+    ======================================================
+    WEBRTC SIGNALING
+    ======================================================
+
+    This forwards:
+
+    - Offers
+    - Answers
+    - ICE candidates
+
+    from one random player directly to their opponent.
+
+    The server NEVER needs to inspect the camera or microphone.
+    ======================================================
+    */
+
+    if (
+      type ===
+      "signal"
+    ) {
+      const room =
+        rooms.get(
+          ws.__roomId
+        );
+
+      if (!room) {
+        return;
+      }
+
+      const opponent =
+        getOpponent(
+          room,
+          ws.__playerId
+        );
+
+      if (!opponent) {
+        return;
+      }
+
+      const opponentWs =
+        getClientByPlayerId(
+          opponent.playerId
+        );
+
+      if (!opponentWs) {
+        return;
+      }
+
+      safeSend(
+        opponentWs,
+        {
+          type: "signal",
+
+          signal:
+            message.signal
+        }
       );
+
+      return;
+    }
+
+    /*
+    ======================================================
+    FACE SCORE
+    ======================================================
+    */
+
+    if (
+      type ===
+      "face-score"
+    ) {
+      const room =
+        rooms.get(
+          ws.__roomId
+        );
 
       if (!room) return;
 
-      const opponent = otherPlayer(
-        room,
+      const score =
+        Math.max(
+          0,
+          Math.min(
+            100,
+            Number(
+              message.score
+            ) || 0
+          )
+        );
+
+      room.scores[
         ws.__playerId
-      );
+      ] = score;
+
+      const opponent =
+        getOpponent(
+          room,
+          ws.__playerId
+        );
 
       if (!opponent) return;
 
@@ -610,95 +1129,81 @@ wss.on("connection", ws => {
           opponent.playerId
         );
 
-      safeSend(opponentWs, {
-        type: "signal",
-        signal: message.signal
-      });
+      safeSend(
+        opponentWs,
+        {
+          type:
+            "opponent-score",
+
+          score
+        }
+      );
+
+      safeSend(
+        ws,
+        {
+          type:
+            "score-updated",
+
+          score
+        }
+      );
 
       return;
     }
 
-    if (type === "face-score") {
-      const room = rooms.get(
-        ws.__roomId
-      );
+    /*
+    ======================================================
+    FACE ROUND FINISHED
+    ======================================================
+    */
+
+    if (
+      type ===
+      "face-round-finished"
+    ) {
+      const room =
+        rooms.get(
+          ws.__roomId
+        );
 
       if (!room) return;
 
-      const score = Math.max(
-        0,
-        Math.min(
-          100,
-          Number(message.score) || 0
-        )
-      );
+      const playerA =
+        room.players[0];
 
-      room.scores[ws.__playerId] = score;
+      const playerB =
+        room.players[1];
 
-      const opponent =
-        otherPlayer(
-          room,
-          ws.__playerId
-        );
-
-      const opponentWs =
-        opponent
-          ? getClientByPlayerId(
-              opponent.playerId
-            )
-          : null;
-
-      safeSend(opponentWs, {
-        type: "opponent-score",
-        score
-      });
-
-      safeSend(ws, {
-        type: "score-updated",
-        score
-      });
-
-      return;
-    }
-
-    if (type === "face-round-finished") {
-      const room = rooms.get(
-        ws.__roomId
-      );
-
-      if (!room) return;
-
-      const opponent =
-        otherPlayer(
-          room,
-          ws.__playerId
-        );
-
-      if (!opponent) return;
-
-      const aScore =
+      const scoreA =
         room.scores[
-          room.players[0].playerId
+          playerA.playerId
         ] || 0;
 
-      const bScore =
+      const scoreB =
         room.scores[
-          room.players[1].playerId
+          playerB.playerId
         ] || 0;
 
       let winner = null;
 
-      if (aScore > bScore) {
+      if (scoreA > scoreB) {
         winner =
-          room.players[0].playerId;
-      } else if (bScore > aScore) {
-        winner =
-          room.players[1].playerId;
+          playerA.playerId;
       }
 
-      for (const player of room.players) {
+      if (scoreB > scoreA) {
+        winner =
+          playerB.playerId;
+      }
+
+      for (
+        const player
+        of room.players
+      ) {
         const won =
-          winner === player.playerId;
+          winner ===
+          player.playerId;
 
         recordGame(
           player.username,
@@ -710,48 +1215,80 @@ wss.on("connection", ws => {
             player.playerId
           );
 
-        safeSend(playerWs, {
-          type: "round-result",
-          winner,
-          myScore:
-            room.scores[
-              player.playerId
-            ] || 0,
-          opponentScore:
-            room.scores[
-              otherPlayer(
-                room,
+        const opponent =
+          getOpponent(
+            room,
+            player.playerId
+          );
+
+        safeSend(
+          playerWs,
+          {
+            type:
+              "round-result",
+
+            winner,
+
+            myScore:
+              room.scores[
                 player.playerId
-              )?.playerId
-            ] || 0,
-          progress:
-            userPayload(
-              getUser(player.username)
-            )
-        });
+              ] || 0,
+
+            opponentScore:
+              opponent
+                ? room.scores[
+                    opponent.playerId
+                  ] || 0
+                : 0,
+
+            progress:
+              userPayload(
+                getUser(
+                  player.username
+                )
+              )
+          }
+        );
       }
 
       return;
     }
 
-    if (type === "chat-message") {
-      const room = rooms.get(
-        ws.__roomId
-      );
+    /*
+    ======================================================
+    CHAT
+    ======================================================
+    */
+
+    if (
+      type ===
+      "chat-message"
+    ) {
+      const room =
+        rooms.get(
+          ws.__roomId
+        );
 
       if (!room) return;
 
-      const text = String(
-        message.text || ""
-      )
-        .replace(/[<>]/g, "")
-        .trim()
-        .slice(0, 300);
+      const text =
+        String(
+          message.text || ""
+        )
+          .replace(
+            /[<>]/g,
+            ""
+          )
+          .trim()
+          .slice(
+            0,
+            300
+          );
 
       if (!text) return;
 
       const opponent =
-        otherPlayer(
+        getOpponent(
           room,
           ws.__playerId
         );
@@ -763,24 +1300,41 @@ wss.on("connection", ws => {
           opponent.playerId
         );
 
-      safeSend(opponentWs, {
-        type: "chat-message",
-        username: ws.__username,
-        text
-      });
+      safeSend(
+        opponentWs,
+        {
+          type:
+            "chat-message",
+
+          username:
+            ws.__username,
+
+          text
+        }
+      );
 
       return;
     }
 
-    if (type === "hunt-found") {
-      const room = rooms.get(
-        ws.__roomId
-      );
+    /*
+    ======================================================
+    HUNT FOUND
+    ======================================================
+    */
+
+    if (
+      type ===
+      "hunt-found"
+    ) {
+      const room =
+        rooms.get(
+          ws.__roomId
+        );
 
       if (!room) return;
 
       const opponent =
-        otherPlayer(
+        getOpponent(
           room,
           ws.__playerId
         );
@@ -790,42 +1344,73 @@ wss.on("connection", ws => {
       const points =
         Math.max(
           0,
-          Number(message.points) || 100
+          Number(
+            message.points
+          ) || 100
         );
 
-      room.scores[ws.__playerId] =
-        (room.scores[ws.__playerId] || 0) +
-        points;
+      room.scores[
+        ws.__playerId
+      ] =
+        (
+          room.scores[
+            ws.__playerId
+          ] || 0
+        ) + points;
 
       const opponentWs =
         getClientByPlayerId(
           opponent.playerId
         );
 
-      safeSend(ws, {
-        type: "hunt-success",
-        score:
-          room.scores[ws.__playerId]
-      });
+      safeSend(
+        ws,
+        {
+          type:
+            "hunt-success",
 
-      safeSend(opponentWs, {
-        type: "opponent-hunt-success",
-        score:
-          room.scores[ws.__playerId]
-      });
+          score:
+            room.scores[
+              ws.__playerId
+            ]
+        }
+      );
+
+      safeSend(
+        opponentWs,
+        {
+          type:
+            "opponent-hunt-success",
+
+          score:
+            room.scores[
+              ws.__playerId
+            ]
+        }
+      );
 
       return;
     }
 
-    if (type === "hunt-timeout") {
-      const room = rooms.get(
-        ws.__roomId
-      );
+    /*
+    ======================================================
+    HUNT TIMEOUT
+    ======================================================
+    */
+
+    if (
+      type ===
+      "hunt-timeout"
+    ) {
+      const room =
+        rooms.get(
+          ws.__roomId
+        );
 
       if (!room) return;
 
       const opponent =
-        otherPlayer(
+        getOpponent(
           room,
           ws.__playerId
         );
@@ -837,26 +1422,44 @@ wss.on("connection", ws => {
           opponent.playerId
         );
 
-      safeSend(opponentWs, {
-        type: "hunt-opponent-timeout"
-      });
+      safeSend(
+        opponentWs,
+        {
+          type:
+            "hunt-opponent-timeout"
+        }
+      );
 
-      safeSend(ws, {
-        type: "hunt-timeout"
-      });
+      safeSend(
+        ws,
+        {
+          type:
+            "hunt-timeout"
+        }
+      );
 
       return;
     }
 
-    if (type === "skip") {
-      const room = rooms.get(
-        ws.__roomId
-      );
+    /*
+    ======================================================
+    SKIP
+    ======================================================
+    */
+
+    if (
+      type ===
+      "skip"
+    ) {
+      const room =
+        rooms.get(
+          ws.__roomId
+        );
 
       if (!room) return;
 
       const opponent =
-        otherPlayer(
+        getOpponent(
           room,
           ws.__playerId
         );
@@ -868,39 +1471,72 @@ wss.on("connection", ws => {
           opponent.playerId
         );
 
-      safeSend(opponentWs, {
-        type: "skip-requested",
-        username: ws.__username
-      });
+      safeSend(
+        opponentWs,
+        {
+          type:
+            "skip-requested",
 
-      safeSend(ws, {
-        type: "skip-requested",
-        username: ws.__username
-      });
+          username:
+            ws.__username
+        }
+      );
+
+      safeSend(
+        ws,
+        {
+          type:
+            "skip-requested",
+
+          username:
+            ws.__username
+        }
+      );
 
       return;
     }
 
-    if (type === "friend-request") {
-      const targetName = cleanUsername(
-        message.username ||
-        message.to
-      );
+    /*
+    ======================================================
+    FRIEND REQUEST
 
-      const fromUser = getUser(
-        ws.__username
-      );
+    FRIENDS ARE SEPARATE FROM RANDOM MATCHMAKING.
+    ======================================================
+    */
+
+    if (
+      type ===
+      "friend-request"
+    ) {
+      const targetName =
+        cleanUsername(
+          message.username ||
+          message.to
+        );
+
+      const fromUser =
+        getUser(
+          ws.__username
+        );
 
       const targetUser =
-        users.get(targetName);
+        users.get(
+          targetName
+        );
 
       if (!targetUser) {
-        safeSend(ws, {
-          type: "friend-result",
-          ok: false,
-          message:
-            "That user is not online."
-        });
+        safeSend(
+          ws,
+          {
+            type:
+              "friend-result",
+
+            ok: false,
+
+            message:
+              "That user is not online."
+          }
+        );
 
         return;
       }
@@ -909,12 +1545,18 @@ wss.on("connection", ws => {
         targetUser.username ===
         fromUser.username
       ) {
-        safeSend(ws, {
-          type: "friend-result",
-          ok: false,
-          message:
-            "You cannot add yourself."
-        });
+        safeSend(
+          ws,
+          {
+            type:
+              "friend-result",
+
+            ok: false,
+
+            message:
+              "You cannot add yourself."
+          }
+        );
 
         return;
       }
@@ -924,12 +1566,18 @@ wss.on("connection", ws => {
           targetUser.username
         )
       ) {
-        safeSend(ws, {
-          type: "friend-result",
-          ok: false,
-          message:
-            "You are already friends."
-        });
+        safeSend(
+          ws,
+          {
+            type:
+              "friend-result",
+
+            ok: false,
+
+            message:
+              "You are already friends."
+          }
+        );
 
         return;
       }
@@ -938,12 +1586,18 @@ wss.on("connection", ws => {
         fromUser.username
       );
 
-      safeSend(ws, {
-        type: "friend-result",
-        ok: true,
-        message:
-          "Friend request sent."
-      });
+      safeSend(
+        ws,
+        {
+          type:
+            "friend-result",
+
+          ok: true,
+
+          message:
+            "Friend request sent."
+        }
+      );
 
       const targetWs =
         [...clients].find(
@@ -952,49 +1606,80 @@ wss.on("connection", ws => {
             targetUser.username
         );
 
-      safeSend(targetWs, {
-        type: "friend-request-received",
-        username:
-          fromUser.username
-      });
+      safeSend(
+        targetWs,
+        {
+          type:
+            "friend-request-received",
+
+          username:
+            fromUser.username
+        }
+      );
 
       return;
     }
 
-    if (type === "friend-accept") {
+    /*
+    ======================================================
+    ACCEPT FRIEND REQUEST
+    ======================================================
+    */
+
+    if (
+      type ===
+      "friend-accept"
+    ) {
       const requester =
         cleanUsername(
           message.username ||
           message.from
         );
 
-      const me = getUser(
-        ws.__username
-      );
+      const me =
+        getUser(
+          ws.__username
+        );
 
       const requesterUser =
-        users.get(requester);
+        users.get(
+          requester
+        );
 
       if (!requesterUser) {
-        safeSend(ws, {
-          type: "friend-result",
-          ok: false,
-          message:
-            "That user is no longer online."
-        });
+        safeSend(
+          ws,
+          {
+            type:
+              "friend-result",
+
+            ok: false,
+
+            message:
+              "That user is no longer online."
+          }
+        );
 
         return;
       }
 
       if (
-        !me.pending.has(requester)
+        !me.pending.has(
+          requester
+        )
       ) {
-        safeSend(ws, {
-          type: "friend-result",
-          ok: false,
-          message:
-            "Friend request not found."
-        });
+        safeSend(
+          ws,
+          {
+            type:
+              "friend-result",
+
+            ok: false,
+
+            message:
+              "Friend request not found."
+          }
+        );
 
         return;
       }
@@ -1011,16 +1696,24 @@ wss.on("connection", ws => {
         me.username
       );
 
-      safeSend(ws, {
-        type: "friend-result",
-        ok: true,
-        message:
-          "Friend request accepted.",
-        friends:
-          [...me.friends],
-        pending:
-          [...me.pending]
-      });
+      safeSend(
+        ws,
+        {
+          type:
+            "friend-result",
+
+          ok: true,
+
+          message:
+            "Friend request accepted.",
+
+          friends:
+            [...me.friends],
+
+          pending:
+            [...me.pending]
+        }
+      );
 
       const requesterWs =
         [...clients].find(
@@ -1029,87 +1722,178 @@ wss.on("connection", ws => {
             requester
         );
 
-      safeSend(requesterWs, {
-        type: "friend-result",
-        ok: true,
-        message:
-          `${me.username} accepted your friend request.`,
-        friends:
-          [...requesterUser.friends],
-        pending:
-          [...requesterUser.pending]
-      });
+      safeSend(
+        requesterWs,
+        {
+          type:
+            "friend-result",
 
-      return;
-    }
+          ok: true,
 
-    if (type === "get-friends") {
-      const user = getUser(
-        ws.__username
+          message:
+            `${me.username} accepted your friend request.`,
+
+          friends:
+            [...requesterUser.friends],
+
+          pending:
+            [...requesterUser.pending]
+        }
       );
 
-      safeSend(ws, {
-        type: "friends-list",
-        friends:
-          [...user.friends],
-        pending:
-          [...user.pending]
-      });
-
       return;
     }
 
-    if (type === "get-progress") {
-      const user = getUser(
-        ws.__username
+    /*
+    ======================================================
+    GET FRIENDS
+    ======================================================
+    */
+
+    if (
+      type ===
+      "get-friends"
+    ) {
+      const user =
+        getUser(
+          ws.__username
+        );
+
+      safeSend(
+        ws,
+        {
+          type:
+            "friends-list",
+
+          friends:
+            [...user.friends],
+
+          pending:
+            [...user.pending]
+        }
       );
 
-      safeSend(ws, {
-        type: "progress",
-        data: userPayload(user),
-        dailyChallenges,
-        badges
-      });
-
       return;
     }
 
-    if (type === "leaderboard") {
-      const list = [
-        ...users.values()
-      ]
-        .sort(
-          (a, b) =>
-            (b.xp + b.wins * 100) -
-            (a.xp + a.wins * 100)
-        )
-        .slice(0, 20)
-        .map((user, index) => ({
-          rank: index + 1,
-          username:
-            user.username,
-          xp: user.xp,
-          level:
-            user.level,
-          wins:
-            user.wins,
-          games:
-            user.games
-        }));
+    /*
+    ======================================================
+    GET PROGRESS
+    ======================================================
+    */
 
-      safeSend(ws, {
-        type: "leaderboard",
-        users: list
-      });
+    if (
+      type ===
+      "get-progress"
+    ) {
+      const user =
+        getUser(
+          ws.__username
+        );
 
-      return;
-    }
+      safeSend(
+        ws,
+        {
+          type:
+            "progress",
 
-    if (type === "invite") {
-      const targetName = cleanUsername(
-        message.username ||
-        message.to
+          data:
+            userPayload(
+              user
+            ),
+
+          dailyChallenges,
+
+          badges
+        }
       );
+
+      return;
+    }
+
+    /*
+    ======================================================
+    LEADERBOARD
+    ======================================================
+    */
+
+    if (
+      type ===
+      "leaderboard"
+    ) {
+      const leaderboard =
+        [
+          ...users.values()
+        ]
+          .sort(
+            (a, b) =>
+              (
+                b.xp +
+                b.wins * 100
+              ) -
+              (
+                a.xp +
+                a.wins * 100
+              )
+          )
+          .slice(
+            0,
+            20
+          )
+          .map(
+            (user, index) => ({
+              rank:
+                index + 1,
+
+              username:
+                user.username,
+
+              xp:
+                user.xp,
+
+              level:
+                user.level,
+
+              wins:
+                user.wins,
+
+              games:
+                user.games
+            })
+          );
+
+      safeSend(
+        ws,
+        {
+          type:
+            "leaderboard",
+
+          users:
+            leaderboard
+        }
+      );
+
+      return;
+    }
+
+    /*
+    ======================================================
+    INVITES
+
+    These are optional and are NOT required for
+    random matchmaking.
+    ======================================================
+    */
+
+    if (
+      type ===
+      "invite"
+    ) {
+      const targetName =
+        cleanUsername(
+          message.username ||
+          message.to
+        );
 
       const targetWs =
         [...clients].find(
@@ -1119,99 +1903,155 @@ wss.on("connection", ws => {
         );
 
       if (!targetWs) {
-        safeSend(ws, {
-          type: "invite-result",
-          ok: false,
-          message:
-            "That player is not online."
-        });
+        safeSend(
+          ws,
+          {
+            type:
+              "invite-result",
+
+            ok: false,
+
+            message:
+              "That player is not online."
+          }
+        );
 
         return;
       }
 
-      safeSend(targetWs, {
-        type: "invite-received",
-        from:
-          ws.__username,
-        mode:
-          message.mode || "face"
-      });
+      safeSend(
+        targetWs,
+        {
+          type:
+            "invite-received",
 
-      safeSend(ws, {
-        type: "invite-result",
-        ok: true
-      });
+          from:
+            ws.__username,
+
+          mode:
+            message.mode ||
+            "face"
+        }
+      );
+
+      safeSend(
+        ws,
+        {
+          type:
+            "invite-result",
+
+          ok: true
+        }
+      );
 
       return;
     }
 
-    if (type === "ping") {
-      safeSend(ws, {
-        type: "pong"
-      });
+    /*
+    ======================================================
+    PING
+    ======================================================
+    */
+
+    if (
+      type ===
+      "ping"
+    ) {
+      safeSend(
+        ws,
+        {
+          type:
+            "pong"
+        }
+      );
 
       return;
     }
   });
+
+  /*
+  ========================================================
+  CONNECTION CLOSED
+  ========================================================
+
+  DO NOT destroy the player's game room.
+
+  Their session remains alive so the browser can reconnect.
+  ========================================================
+  */
 
   ws.on("close", () => {
     clients.delete(ws);
 
     removeFromWaiting(ws);
 
-    /*
-      IMPORTANT:
-      Do NOT end the game when a player disconnects.
+    const room =
+      rooms.get(
+        ws.__roomId
+      );
 
-      The session stays alive so the player can reconnect
-      after Wi-Fi problems, browser freezes, or accidental
-      connection drops.
-    */
+    if (!room) {
+      return;
+    }
 
-    const room = rooms.get(
-      ws.__roomId
-    );
-
-    if (room) {
-      const player = getRoomPlayer(
+    const player =
+      getPlayerById(
         room,
         ws.__playerId
       );
 
-      if (player) {
-        player.ws = null;
-      }
+    if (player) {
+      player.ws = null;
+    }
 
-      const opponent =
-        otherPlayer(
-          room,
-          ws.__playerId
+    const opponent =
+      getOpponent(
+        room,
+        ws.__playerId
+      );
+
+    if (opponent) {
+      const opponentWs =
+        getClientByPlayerId(
+          opponent.playerId
         );
 
-      if (opponent) {
-        const opponentWs =
-          getClientByPlayerId(
-            opponent.playerId
-          );
-
-        safeSend(opponentWs, {
+      safeSend(
+        opponentWs,
+        {
           type:
             "opponent-temporarily-disconnected"
-        });
-      }
+        }
+      );
     }
   });
 });
 
+/*
+==========================================================
+SERVER HEARTBEAT
+==========================================================
+*/
+
 setInterval(() => {
   for (const ws of clients) {
     if (ws.readyState === 1) {
-      safeSend(ws, {
-        type: "server-ping"
-      });
+      safeSend(
+        ws,
+        {
+          type:
+            "server-ping"
+        }
+      );
     }
   }
 }, 25000);
+
+/*
+==========================================================
+START SERVER
+==========================================================
+*/
 
 server.listen(
   PORT,
